@@ -16,8 +16,8 @@ namespace Chip
         /// new tabs/panels will automatically be created.
         /// </summary>
         public ChipComponent()
-          : base("Chip", "Nickname",
-            "Description",
+          : base("TimberCurve", "TimberCurve",
+            "TimberCurve",
             "Category", "Subcategory")
         {
         }
