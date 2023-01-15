@@ -39,8 +39,9 @@ namespace Chip
         /// </summary>
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
         {
-            pManager.AddCurveParameter("CenterCurve","CenterCurve", "CenterCurve", GH_ParamAccess.list);
+            pManager.AddCurveParameter("CenterSection", "CenterSection", "CenterSection", GH_ParamAccess.list);
             pManager.AddGeometryParameter("section","section","section",GH_ParamAccess.list);
+            pManager.AddGeometryParameter("´CenterCurve", "CenterCurve", "CenterCurve", GH_ParamAccess.list);
         }
 
         /// <summary>
@@ -117,6 +118,75 @@ namespace Chip
                 centers.Add(average);
             }
             List<Point3d> orderedcenter = centers.OrderByDescending(cen => cen.DistanceTo(contourPoints[1])).ToList().ToList();
+
+            bool jointstart = false;
+            Vector3d lastvector = new Vector3d();
+            List<Polyline> centerCrv = new List<Polyline>();
+            for (int i = 0; i < orderedcenter.Count; i++)
+            {
+                Polyline pline = new Polyline();
+                if (i == 0)
+                {
+                    Vector3d centerdirection = new Vector3d(contourPoints[0].X - orderedcenter[i + 1].X,
+                        contourPoints[0].Y - orderedcenter[i + 1].Y,
+                        contourPoints[0].Z - orderedcenter[i + 1].Z);
+                    pline.Add(contourPoints[0]);
+                    pline.Add(orderedcenter[i + 1]);
+                    centerCrv.Add(pline);
+                    lastvector = centerdirection;
+                }
+                else if (i == orderedcenter.Count - 1)
+                {
+                    Vector3d centerdirection = new Vector3d(orderedcenter[i].X - contourPoints[1].X,
+                        orderedcenter[i].Y - contourPoints[1].Y,
+                        orderedcenter[i].Z - contourPoints[1].Z);
+
+
+                    pline.Add(orderedcenter[i]);
+                    pline.Add(contourPoints[1]);
+                    centerCrv.Add(pline);
+                    lastvector = centerdirection;
+
+                }
+
+                else
+                {
+                    Vector3d centerdirection = new Vector3d(orderedcenter[i].X - orderedcenter[i + 1].X,
+                        orderedcenter[i].Y - orderedcenter[i + 1].Y,
+                        orderedcenter[i].Z - orderedcenter[i + 1].Z);
+                    double anglediffer = Vector3d.VectorAngle(lastvector , centerdirection);
+                    if (anglediffer > 0.3 && jointstart== false)
+                    {
+                        jointstart = true;
+                        lastvector= centerdirection;
+                        continue;
+
+                        
+                    }
+                    else if(jointstart)
+                    {
+                        
+                        if (anglediffer > 1.04)
+                        {
+                            jointstart = false;
+                            lastvector = new Vector3d(orderedcenter[i+1].X - orderedcenter[i + 2].X,
+                        orderedcenter[i+1].Y - orderedcenter[i + 2].Y,
+                        orderedcenter[i+1].Z - orderedcenter[i + 2].Z);
+                        }
+                        continue;
+                    }
+                    else
+                    {
+                        pline.Add(orderedcenter[i]);
+                        pline.Add(orderedcenter[i + 1]);
+                        centerCrv.Add(pline);
+                        lastvector = centerdirection;
+                    }
+
+                }
+
+            }
+
             List<Polyline> polylines = new List<Polyline>();
             for(int i= 0; i< orderedcenter.Count; i++)
             {
@@ -148,6 +218,7 @@ namespace Chip
 
             DA.SetDataList(0, polylines);
             DA.SetDataList(1, contourCrv);
+            DA.SetDataList(2, centerCrv);
 
         }
 
