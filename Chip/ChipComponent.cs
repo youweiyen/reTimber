@@ -41,7 +41,8 @@ namespace Chip
         {
             pManager.AddCurveParameter("CenterSection", "CenterSection", "CenterSection", GH_ParamAccess.list);
             pManager.AddGeometryParameter("section","section","section",GH_ParamAccess.list);
-            pManager.AddGeometryParameter("´CenterCurve", "CenterCurve", "CenterCurve", GH_ParamAccess.list);
+            pManager.AddGeometryParameter("CenterCurve", "CenterCurve", "CenterCurve", GH_ParamAccess.list);
+            pManager.AddGeometryParameter("CenterAxis", "CenterAxis", "CenterAxis", GH_ParamAccess.item);
         }
 
         /// <summary>
@@ -122,6 +123,7 @@ namespace Chip
             bool jointstart = false;
             Vector3d lastvector = new Vector3d();
             List<Polyline> centerCrv = new List<Polyline>();
+            List<Point3d> axisPoints = new List<Point3d>();
             for (int i = 0; i < orderedcenter.Count; i++)
             {
                 Polyline pline = new Polyline();
@@ -132,6 +134,8 @@ namespace Chip
                         contourPoints[0].Z - orderedcenter[i + 1].Z);
                     pline.Add(contourPoints[0]);
                     pline.Add(orderedcenter[i + 1]);
+                    axisPoints.Add(contourPoints[0]);
+                    axisPoints.Add(orderedcenter[i + 1]);
                     centerCrv.Add(pline);
                     lastvector = centerdirection;
                 }
@@ -144,6 +148,8 @@ namespace Chip
 
                     pline.Add(orderedcenter[i]);
                     pline.Add(contourPoints[1]);
+                    axisPoints.Add(orderedcenter[i]);
+                    axisPoints.Add(contourPoints[1]);
                     centerCrv.Add(pline);
                     lastvector = centerdirection;
 
@@ -179,6 +185,8 @@ namespace Chip
                     {
                         pline.Add(orderedcenter[i]);
                         pline.Add(orderedcenter[i + 1]);
+                        axisPoints.Add(orderedcenter[i]);
+                        axisPoints.Add(orderedcenter[i + 1]);
                         centerCrv.Add(pline);
                         lastvector = centerdirection;
                     }
@@ -212,13 +220,18 @@ namespace Chip
                 }
 
             }
-
+            Polyline centeraxis = new Polyline();
+            foreach(Point3d aP in axisPoints)
+            {
+                centeraxis.Add(aP);
+            }
             //previewCurve.AddRange(contourCrv);
 
 
             DA.SetDataList(0, polylines);
             DA.SetDataList(1, contourCrv);
             DA.SetDataList(2, centerCrv);
+            DA.SetData(3, centeraxis);
 
         }
 
