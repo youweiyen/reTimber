@@ -124,7 +124,8 @@ namespace Chip
                 if(i == 0)
                 {
                     pline.Add(contourPoints[0]);
-                    pline.Add(orderedcenter[i]);
+                    pline.Add(orderedcenter[i+1]);
+                    polylines.Add(pline);
                 }
                 else if (i == orderedcenter.Count-1) 
                 {
