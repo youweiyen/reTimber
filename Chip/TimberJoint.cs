@@ -27,7 +27,7 @@ namespace Chip
         /// </summary>
         protected override void RegisterInputParams(GH_Component.GH_InputParamManager pManager)
         {
-            pManager.AddMeshParameter("SegmentMeshes", "SegmentMeshes", "SegmentMeshes", GH_ParamAccess.list);
+            pManager.AddMeshParameter("ScanMesh", "ScanMesh", "ScanMesh", GH_ParamAccess.list);
             pManager.AddCurveParameter("CenterAxis", "CenterAxis", "CenterAxis", GH_ParamAccess.item);
             
         }
@@ -93,23 +93,49 @@ namespace Chip
             }
             Dictionary<int,List<Mesh>>.ValueCollection meshsegs= directionMeshes.Values;
 
-            //List<Mesh> SeperatedMeshes = new List<Mesh>();
-            DataTree<Mesh> SeperatedMeshes = new DataTree<Mesh>();
+            List<Mesh> JointMeshes = new List<Mesh>();
+            DataTree<Mesh> SeperatedShow = new DataTree<Mesh>();
             //GH_Structure<IGH_Goo> seperate = new GH_Structure<IGH_Goo>();
+            double jointdepth = NumericExtensions.FromMeter(-0.009);
             int j = 0;
             foreach (List<Mesh> meshlists in meshsegs)
             {
-                
-                foreach(Mesh m in meshlists)
+                Mesh largestmesh = meshlists.OrderByDescending(msh => AreaMassProperties.Compute(msh, true, false, false, false).Area).First();
+                double avX = largestmesh.Normals.Average(normals => normals.X);
+                double avY = largestmesh.Normals.Average(normals => normals.Y);
+                double avZ = largestmesh.Normals.Average(normals => normals.Z);
+                Vector3d faceNormal = new Vector3d(avX, avY, avZ);
+                double centX = largestmesh.Vertices.Average(ver => ver.X);
+                double centY = largestmesh.Vertices.Average(ver => ver.Y);
+                double centZ = largestmesh.Vertices.Average(ver => ver.Z);
+                Point3d faceCenter = new Point3d(centX, centY, centZ);
+                Plane largestPlane = new Plane(faceCenter, faceNormal);
+                Transform orientBylargestMesh = Transform.PlaneToPlane(largestPlane, originplane);
+                foreach( Mesh mL in meshlists)
+                {   
+                    Mesh copyML= new Mesh();
+                    copyML.Append(mL);
+                    copyML.Transform(orientBylargestMesh);
+
+                    double depth = copyML.Vertices.Average(ver => ver.Z);
+
+                    if (depth < jointdepth)
+                    {
+                        JointMeshes.Add(mL);
+                    }
+                }
+                //for showing in datatree
+                foreach (Mesh m in meshlists)
                 {
                     GH_Path pth = new GH_Path(j);
-                    SeperatedMeshes.Add(m, pth);
+                    SeperatedShow.Add(m, pth);
                 }
                 j++;
             }
 
-            DA.SetDataTree(0, SeperatedMeshes);
+            DA.SetDataTree(0, SeperatedShow);
             DA.SetData(1, brep);
+            DA.SetDataList(2, JointMeshes);
         }
 
         /// <summary>
