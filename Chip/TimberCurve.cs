@@ -8,7 +8,7 @@ using System.Security.Cryptography;
 
 namespace Chip
 {
-    public class ChipComponent : GH_Component
+    public class TimberCurve : GH_Component
     {
         /// <summary>
         /// Each implementation of GH_Component must provide a public 
@@ -17,7 +17,7 @@ namespace Chip
         /// Subcategory the panel. If you use non-existing tab or panel names, 
         /// new tabs/panels will automatically be created.
         /// </summary>
-        public ChipComponent()
+        public TimberCurve()
           : base("TimberCurve", "TimberCurve",
             "TimberCurve",
             "Category", "Subcategory")
