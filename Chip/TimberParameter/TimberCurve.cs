@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 
-namespace Chip
+namespace Chip.TimberParameter
 {
     public class TimberCurve : GH_Component
     {
@@ -28,7 +28,7 @@ namespace Chip
         /// <summary>
         /// Registers all the input parameters for this component.
         /// </summary>
-        protected override void RegisterInputParams(GH_Component.GH_InputParamManager pManager)
+        protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
             pManager.AddMeshParameter("ScanMesh", "ScanMesh", "ScanMesh", GH_ParamAccess.list);
             pManager.AddMeshParameter("SectionSides", "SectionSides", "SectionSides", GH_ParamAccess.list);
@@ -37,10 +37,10 @@ namespace Chip
         /// <summary>
         /// Registers all the output parameters for this component.
         /// </summary>
-        protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
+        protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
             pManager.AddCurveParameter("CenterSection", "CenterSection", "CenterSection", GH_ParamAccess.list);
-            pManager.AddGeometryParameter("section","section","section",GH_ParamAccess.list);
+            pManager.AddGeometryParameter("section", "section", "section", GH_ParamAccess.list);
             pManager.AddGeometryParameter("CenterCurve", "CenterCurve", "CenterCurve", GH_ParamAccess.list);
             pManager.AddGeometryParameter("CenterAxis", "CenterAxis", "CenterAxis", GH_ParamAccess.item);
         }
@@ -58,7 +58,7 @@ namespace Chip
             DA.GetDataList(1, SectionSides);
 
             List<Point3d> contourPoints = new List<Point3d>();
-            foreach(Mesh ss in SectionSides) 
+            foreach (Mesh ss in SectionSides)
             {
                 BoundingBox bbox = ss.GetBoundingBox(false);
                 Point3d p = bbox.Center;
@@ -73,13 +73,15 @@ namespace Chip
             Point3d sectionstart = contourPoints[0];
             sectionstart.Transform(movealongsection);
             Mesh JoinMesh = new Mesh();
-            foreach(Mesh sm in ScannedMeshes)
+            foreach (Mesh sm in ScannedMeshes)
             {
                 JoinMesh.Append(sm);
             }
-            double contourDist = NumericExtensions.FromMeter(0.02);
+            double contourDist = 0.02.FromMeter();
             IEnumerable<Curve> contourcurves = Mesh.CreateContourCurves(JoinMesh, sectionstart, contourPoints[1], contourDist, 0.01).ToList();
-            List<Curve> contourCrv = Curve.JoinCurves(contourcurves, contourDist*0.1, false).ToList();
+            List<Curve> contourCrv = Curve.JoinCurves(contourcurves, contourDist * 0.1, false).ToList();
+
+            #region dunno
             //List<Curve> contourCrv = new List<Curve>();
             //for(int j = 0; j < joined.Count; j++)
             //{
@@ -107,8 +109,10 @@ namespace Chip
             //        }
             //    }
             //}
+            #endregion
+
             List<Point3d> centers = new List<Point3d>();
-            foreach(Curve crv in contourCrv)
+            foreach (Curve crv in contourCrv)
             {
                 crv.DivideByCount(20, true, out Point3d[] cP);
                 List<Point3d> curvePoints = cP.ToList();
@@ -160,24 +164,24 @@ namespace Chip
                     Vector3d centerdirection = new Vector3d(orderedcenter[i].X - orderedcenter[i + 1].X,
                         orderedcenter[i].Y - orderedcenter[i + 1].Y,
                         orderedcenter[i].Z - orderedcenter[i + 1].Z);
-                    double anglediffer = Vector3d.VectorAngle(lastvector , centerdirection);
-                    if (anglediffer > 0.3 && jointstart== false)
+                    double anglediffer = Vector3d.VectorAngle(lastvector, centerdirection);
+                    if (anglediffer > 0.3 && jointstart == false)
                     {
                         jointstart = true;
-                        lastvector= centerdirection;
+                        lastvector = centerdirection;
                         continue;
 
-                        
+
                     }
-                    else if(jointstart)
+                    else if (jointstart)
                     {
-                        
+                        //maybe future change the difference to double the angle of the first tilted vector
                         if (anglediffer > 1.04)
                         {
                             jointstart = false;
-                            lastvector = new Vector3d(orderedcenter[i+1].X - orderedcenter[i + 2].X,
-                        orderedcenter[i+1].Y - orderedcenter[i + 2].Y,
-                        orderedcenter[i+1].Z - orderedcenter[i + 2].Z);
+                            lastvector = new Vector3d(orderedcenter[i + 1].X - orderedcenter[i + 2].X,
+                        orderedcenter[i + 1].Y - orderedcenter[i + 2].Y,
+                        orderedcenter[i + 1].Z - orderedcenter[i + 2].Z);
                         }
                         continue;
                     }
@@ -196,16 +200,16 @@ namespace Chip
             }
 
             List<Polyline> polylines = new List<Polyline>();
-            for(int i= 0; i< orderedcenter.Count; i++)
+            for (int i = 0; i < orderedcenter.Count; i++)
             {
                 Polyline pline = new Polyline();
-                if(i == 0)
+                if (i == 0)
                 {
                     pline.Add(contourPoints[0]);
-                    pline.Add(orderedcenter[i+1]);
+                    pline.Add(orderedcenter[i + 1]);
                     polylines.Add(pline);
                 }
-                else if (i == orderedcenter.Count-1) 
+                else if (i == orderedcenter.Count - 1)
                 {
                     pline.Add(orderedcenter[i]);
                     pline.Add(contourPoints[1]);
@@ -221,7 +225,7 @@ namespace Chip
 
             }
             Polyline centeraxis = new Polyline();
-            foreach(Point3d aP in axisPoints)
+            foreach (Point3d aP in axisPoints)
             {
                 centeraxis.Add(aP);
             }
