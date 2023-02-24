@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
+using Chip.UnitHelper;
 
 namespace Chip.TimberParameter
 {
@@ -271,34 +272,5 @@ namespace Chip.TimberParameter
         /// </summary>
         public override Guid ComponentGuid => new Guid("c4e36432-eeac-42f7-8682-f08a6f8cf886");
     }
-    public static class NumericExtensions
-    {
-        public static double FromMeter(this double length)
-        {
-            return length * GetConversionFactor();
-        }
-
-
-        public static double GetConversionFactor()
-        {
-
-            switch (Rhino.RhinoDoc.ActiveDoc.ModelUnitSystem)
-            {
-                case Rhino.UnitSystem.Meters:
-                    return 1.0;
-
-                case Rhino.UnitSystem.Millimeters:
-                    return 1000.0;
-
-                case Rhino.UnitSystem.Centimeters:
-                    return 100.0;
-
-                case Rhino.UnitSystem.Feet:
-                    return 304.8 / 1000.0;
-
-                default:
-                    throw new Exception("unknown units");
-            }
-        }
-    }
+    
 }

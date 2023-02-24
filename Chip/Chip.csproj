@@ -8,14 +8,15 @@
     <TargetExt>.gha</TargetExt>
     <BaseOutputPath>bin\</BaseOutputPath>
   </PropertyGroup>
-  
+	
   <ItemGroup>
-    <PackageReference Include="Grasshopper" Version="7.13.21348.13001" IncludeAssets="compile;build" />
+    <Compile Remove="ReclaimedTimber\**" />
+    <EmbeddedResource Remove="ReclaimedTimber\**" />
+    <None Remove="ReclaimedTimber\**" />
   </ItemGroup>
   
   <ItemGroup>
-    <Folder Include="NewFolder\" />
-    <Folder Include="ReclaimedTimber\" />
+    <PackageReference Include="Grasshopper" Version="7.13.21348.13001" IncludeAssets="compile;build" />
   </ItemGroup>
   
   <PropertyGroup Condition="$(Configuration) == 'Debug' AND $([MSBuild]::IsOSPlatform(Windows))">

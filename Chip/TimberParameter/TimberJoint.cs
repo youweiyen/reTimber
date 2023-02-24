@@ -8,6 +8,7 @@ using Grasshopper.Kernel.Data;
 using Grasshopper.Kernel.Types;
 using Rhino.Geometry;
 using Rhino.Geometry.Collections;
+using Chip.UnitHelper;
 
 namespace Chip.TimberParameter
 {
