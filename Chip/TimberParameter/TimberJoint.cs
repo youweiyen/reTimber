@@ -28,7 +28,7 @@ namespace Chip.TimberParameter
         /// </summary>
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
-            pManager.AddMeshParameter("ScanMesh", "ScanMesh", "ScanMesh", GH_ParamAccess.list);
+            pManager.AddMeshParameter("SegmentedMesh", "SegmentedMesh", "SegmentedMesh", GH_ParamAccess.list);
             pManager.AddCurveParameter("CenterAxis", "CenterAxis", "CenterAxis", GH_ParamAccess.item);
 
         }
@@ -50,8 +50,8 @@ namespace Chip.TimberParameter
         protected override void SolveInstance(IGH_DataAccess DA)
         {
             ReclaimedElement timber = new ReclaimedElement();
-
-            List<Mesh> meshFaces = new List<Mesh>();
+            List<Mesh> meshFaces = timber.SegmentedMesh;
+            //List<Mesh> meshFaces = new List<Mesh>;
             Curve centerAxis = null;
             DA.GetDataList(0, meshFaces);
             DA.GetData(1, ref centerAxis);
@@ -75,6 +75,7 @@ namespace Chip.TimberParameter
             timber.Boundary = boundingBrep;
 
             //get the surfaces that are the same normal to each faces of the brep
+            //Bounding Brep Normal
             List<Vector3d> brepfacenormals = new List<Vector3d>();
             Dictionary<int, List<Mesh>> directionMeshes = new Dictionary<int, List<Mesh>>();
             for (int i = 0; i < boundingBrep.Faces.Count; i++)
@@ -82,8 +83,7 @@ namespace Chip.TimberParameter
                 brepfacenormals.Add(boundingBrep.Faces[i].NormalAt(0.5, 0.5));
                 directionMeshes.Add(i, new List<Mesh>());
             }
-
-
+            //Each Mesh normal
             foreach (Mesh mF in meshFaces)
             {
                 mF.UnifyNormals();
@@ -92,16 +92,19 @@ namespace Chip.TimberParameter
                 double avY = mF.Normals.Average(normals => normals.Y);
                 double avZ = mF.Normals.Average(normals => normals.Z);
                 Vector3d faceNormal = new Vector3d(avX, avY, avZ);
-                //Vector3d meshNormal = (Vector3d)mF.Normals[meshcount/2];
+
+                //foreach mesh, compare and assign to closest brep face normal group 
                 Vector3d closestItem = brepfacenormals.OrderByDescending(fc => (faceNormal - fc).Length).Last();
                 int closest = brepfacenormals.IndexOf(closestItem);
                 directionMeshes[closest].Add(mF);
+                timber.Normal.Add(faceNormal);
             }
-            Dictionary<int, List<Mesh>>.ValueCollection meshsegs = directionMeshes.Values;
 
+
+            Dictionary<int, List<Mesh>>.ValueCollection meshsegs = directionMeshes.Values;
             List<Mesh> JointMeshes = new List<Mesh>();
             DataTree<Mesh> SeperatedShow = new DataTree<Mesh>();
-            //GH_Structure<IGH_Goo> seperate = new GH_Structure<IGH_Goo>();
+
             double jointdepth = (-0.009).FromMeter();
             int j = 0;
             foreach (List<Mesh> meshlists in meshsegs)

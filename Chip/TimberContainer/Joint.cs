@@ -9,20 +9,30 @@ namespace Chip.TimberContainer
 {
     public class Joint
     {
-        public Plane Plane;
-        public string Type;
-        public double Depth;
-        public Mesh Face;
+        /// <summary>
+        /// Joint base plane
+        /// </summary>
+        public Plane Plane { get; set; }
+        /// <summary>
+        /// joint type
+        /// </summary>
+        public string Type { get; set; }
+        /// <summary>
+        /// joint depth compared to same largest normal surface
+        /// </summary>
+        public double Depth { get; set; }
+        /// <summary>
+        /// joint meshes
+        /// </summary>
+        public Mesh Face { get; set; }
 
-        public Joint()
-        {
-            Plane = Plane.Unset;
-            Type = "None";
-            Depth = double.NaN;
-            Face = new Mesh();
-        }
-
-
+        //public Joint()
+        //{
+        //    Plane = Plane.Unset;
+        //    Type = "None";
+        //    Depth = double.NaN;
+        //    Face = new Mesh();
+        //}
 
     }
 }

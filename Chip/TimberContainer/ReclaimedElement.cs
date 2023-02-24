@@ -34,6 +34,10 @@ namespace Chip.TimberContainer
         /// timber bounding box as brep
         /// </summary>
         public Brep Boundary { get; set; }
+        /// <summary>
+        /// normal of every timber surface
+        /// </summary>
+        public List<Vector3d> Normal { get; set; }
 
 
     }
