@@ -101,15 +101,18 @@ namespace Chip.TimberParameter
                 timber.Normal.Add(faceNormal);
             }
 
-
+            //For each group of normals, find the largest surface there is to set as the timber surface
             Dictionary<int, List<Mesh>>.ValueCollection meshsegs = directionMeshes.Values;
-            List<Mesh> JointMeshes = new List<Mesh>();
+            Joint timberjoint = new Joint();
+            //List<Mesh> JointMeshes = new List<Mesh>();
             DataTree<Mesh> SeperatedShow = new DataTree<Mesh>();
 
             double jointdepth = (-0.009).FromMeter();
             int j = 0;
+            //meshsegs = the list of meshes in each group
             foreach (List<Mesh> meshlists in meshsegs)
             {
+                //largest mesh center, normal and plane
                 Mesh largestmesh = meshlists.OrderByDescending(msh => AreaMassProperties.Compute(msh, true, false, false, false).Area).First();
                 double avX = largestmesh.Normals.Average(normals => normals.X);
                 double avY = largestmesh.Normals.Average(normals => normals.Y);
@@ -120,18 +123,23 @@ namespace Chip.TimberParameter
                 double centZ = largestmesh.Vertices.Average(ver => ver.Z);
                 Point3d faceCenter = new Point3d(centX, centY, centZ);
                 Plane largestPlane = new Plane(faceCenter, faceNormal);
-                Transform orientBylargestMesh = Transform.PlaneToPlane(largestPlane, originplane);
-                foreach (Mesh mL in meshlists)
-                {
-                    Mesh copyML = new Mesh();
-                    copyML.Append(mL);
-                    copyML.Transform(orientBylargestMesh);
 
-                    double depth = copyML.Vertices.Average(ver => ver.Z);
+                //move to the origin point to compare z value
+                Transform orientBylargestMesh = Transform.PlaneToPlane(largestPlane, originplane);
+                
+                foreach (Mesh msh in meshlists)
+                {
+                    Mesh dupMsh = new Mesh();
+                    dupMsh.Append(msh);
+                    dupMsh.Transform(orientBylargestMesh);
+                    //z value of each mesh in the list
+                    double depth = dupMsh.Vertices.Average(ver => ver.Z);
 
                     if (depth < jointdepth)
                     {
-                        JointMeshes.Add(mL);
+                        timberjoint.Face.Add(msh);
+                        //JointMeshes.Add(msh);
+                        timberjoint.Depth.Add(depth);
                     }
                 }
                 //for showing in datatree
@@ -143,12 +151,12 @@ namespace Chip.TimberParameter
                 j++;
             }
 
-            Joint foundJoint = new Joint();
-            foundJoint.Depth = double.NaN;
+            timber.Joint.Add(timberjoint);
 
             DA.SetDataTree(0, SeperatedShow);
             DA.SetData(1, boundingBrep);
-            DA.SetDataList(2, JointMeshes);
+            DA.SetDataList(2, timberjoint.Face);
+            //DA.SetDataList(2, JointMeshes);
         }
 
         /// <summary>

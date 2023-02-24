@@ -21,7 +21,7 @@ namespace Chip.TimberContainer
         /// <summary>
         /// timber joint
         /// </summary>
-        public List<Joint> Joints { get; set; }
+        public List<Joint> Joint { get; set; }
         /// <summary>
         /// section lines of scanned timber
         /// </summary>

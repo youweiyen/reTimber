@@ -7,7 +7,7 @@ using Rhino.Geometry;
 
 namespace Chip.TimberContainer
 {
-    public class Joint
+    public class Joint: ReclaimedElement
     {
         /// <summary>
         /// Joint base plane
@@ -20,11 +20,11 @@ namespace Chip.TimberContainer
         /// <summary>
         /// joint depth compared to same largest normal surface
         /// </summary>
-        public double Depth { get; set; }
+        public List<double> Depth { get; set; }
         /// <summary>
         /// joint meshes
         /// </summary>
-        public Mesh Face { get; set; }
+        public List<Mesh> Face { get; set; }
 
         //public Joint()
         //{
