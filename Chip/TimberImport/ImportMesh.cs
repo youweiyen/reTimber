@@ -24,6 +24,7 @@ namespace Chip.TimberImport
         {
             pManager.AddBooleanParameter("Import", "I", "True to import", GH_ParamAccess.item);
             pManager.AddTextParameter("File", "F", "File location", GH_ParamAccess.item);
+            pManager.AddBooleanParameter("MeshType", "MT", "True = Segment, False = Single", GH_ParamAccess.item);
         }
 
         /// <summary>
@@ -42,35 +43,67 @@ namespace Chip.TimberImport
         {
             bool toggle = false;
             DA.GetData(0, ref toggle);
-
-            String fileFolder = null;
+            string fileFolder = null;
             DA.GetData(1, ref fileFolder);
+            bool type = false;
+            DA.GetData(2, ref type);
+
+            ImportType importType = ImportType.None;
+            if (type) { importType = ImportType.Segment; }
+            else { importType = ImportType.Single; }
 
             string sum = null;
 
-            while (toggle)
+            if (importType == ImportType.Segment)
             {
-                for (int i = 0; i < 200; i++)
+                while (toggle)
                 {
-                    String tempFile = fileFolder + "/mesh" + i + ".obj";
+                    for (int i = 0; i < 200; i++)
+                    {
+                        string tempFile = fileFolder + "/mesh" + i + ".obj";
+                        Rhino.FileIO.FileReadOptions read_options = new Rhino.FileIO.FileReadOptions();
+                        read_options.BatchMode = true;
+                        read_options.ImportMode = true;
+                        Rhino.FileIO.FileObjReadOptions obj_options = new Rhino.FileIO.FileObjReadOptions(read_options);
+                        bool objMesh = Rhino.FileIO.FileObj.Read(tempFile, RhinoDoc.ActiveDoc, obj_options);
+                        if (objMesh == false)
+                        {
+                            sum = $"imported {i} files";
+                            break;
+                        }
+
+                    }
+                    break;
+                }
+            }
+
+            else if(importType== ImportType.Single) 
+            {
+                while (toggle)
+                {
+
+                    string tempFile = fileFolder;
                     Rhino.FileIO.FileReadOptions read_options = new Rhino.FileIO.FileReadOptions();
                     read_options.BatchMode = true;
                     read_options.ImportMode = true;
                     Rhino.FileIO.FileObjReadOptions obj_options = new Rhino.FileIO.FileObjReadOptions(read_options);
                     bool objMesh = Rhino.FileIO.FileObj.Read(tempFile, RhinoDoc.ActiveDoc, obj_options);
-                    if (objMesh == false)
-                    {
-                        sum = $"imported {i} files";
-                        break;
-                    }
+
+                    sum = "imported 1 file";
+                    break;
 
                 }
-                break;
             }
 
             DA.SetData(0, sum);
         }
+        public enum ImportType
+        {
+            None,
+            Single,
+            Segment,
 
+        }
         /// <summary>
         /// Provides an Icon for the component.
         /// </summary>

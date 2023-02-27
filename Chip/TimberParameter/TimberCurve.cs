@@ -19,7 +19,7 @@ namespace Chip.TimberParameter
         /// new tabs/panels will automatically be created.
         /// </summary>
         public TimberCurve()
-          : base("TimberCurve", "TimberCurve", "TimberCurve", "Chip", "Parameter")
+          : base("TimberCurve", "TC", "Find Timber Center Curve", "Chip", "Parameter")
         {
         }
         //List<Curve> previewCurve = new List<Curve>();

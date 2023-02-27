@@ -18,7 +18,7 @@ namespace Chip.TimberParameter
         /// Initializes a new instance of the MyComponent1 class.
         /// </summary>
         public TimberJoint()
-          : base("TimberJoint", "TimberJoint", "TimberJoint", "Chip", "Parameter")
+          : base("TimberJoint", "TJ", "Find Timber Joints", "Chip", "Parameter")
         {
         }
 
