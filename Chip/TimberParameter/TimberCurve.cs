@@ -19,9 +19,7 @@ namespace Chip.TimberParameter
         /// new tabs/panels will automatically be created.
         /// </summary>
         public TimberCurve()
-          : base("TimberCurve", "TimberCurve",
-            "TimberCurve",
-            "Category", "Subcategory")
+          : base("TimberCurve", "TimberCurve", "TimberCurve", "Chip", "Parameter")
         {
         }
         //List<Curve> previewCurve = new List<Curve>();
@@ -53,6 +51,7 @@ namespace Chip.TimberParameter
         /// to store data in output parameters.</param>
         protected override void SolveInstance(IGH_DataAccess DA)
         {
+            
             List<Mesh> ScannedMeshes = new List<Mesh>();
             List<Mesh> SectionSides = new List<Mesh>();
             DA.GetDataList(0, ScannedMeshes);
@@ -263,7 +262,7 @@ namespace Chip.TimberParameter
         /// You can add image files to your project resources and access them like this:
         /// return Resources.IconForThisComponent;
         /// </summary>
-        protected override System.Drawing.Bitmap Icon => null;
+        protected override System.Drawing.Bitmap Icon => Properties.Resources.icon;
 
         /// <summary>
         /// Each component must have a unique Guid to identify it. 

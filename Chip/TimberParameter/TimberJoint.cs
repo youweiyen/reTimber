@@ -18,9 +18,7 @@ namespace Chip.TimberParameter
         /// Initializes a new instance of the MyComponent1 class.
         /// </summary>
         public TimberJoint()
-          : base("TimberJoint", "TimberJoint",
-              "TimberJoint",
-              "Category", "Subcategory")
+          : base("TimberJoint", "TimberJoint", "TimberJoint", "Chip", "Parameter")
         {
         }
 
@@ -175,7 +173,7 @@ namespace Chip.TimberParameter
             {
                 //You can add image files to your project resources and access them like this:
                 // return Resources.IconForThisComponent;
-                return null;
+                return Properties.Resources.icon;
             }
         }
 
