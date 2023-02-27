@@ -18,7 +18,7 @@ namespace Chip.TimberParameter
         /// Initializes a new instance of the MyComponent1 class.
         /// </summary>
         public TimberJoint()
-          : base("TimberJoint", "TJ", "Find Timber Joints", "Chip", "Parameter")
+          : base("TimberJoint", "TJ", "Find Timber Joints", "Chip", "Geometry")
         {
         }
 
@@ -27,8 +27,8 @@ namespace Chip.TimberParameter
         /// </summary>
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
-            pManager.AddMeshParameter("SegmentedMesh", "SegmentedMesh", "SegmentedMesh", GH_ParamAccess.list);
-            pManager.AddCurveParameter("CenterAxis", "CenterAxis", "CenterAxis", GH_ParamAccess.item);
+            pManager.AddMeshParameter("SegmentedMesh", "SegMesh", "Segmented Mesh", GH_ParamAccess.list);
+            pManager.AddCurveParameter("CenterCurve", "Crv", "Center Curve of Timber", GH_ParamAccess.item);
 
         }
 
@@ -37,8 +37,8 @@ namespace Chip.TimberParameter
         /// </summary>
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
-            pManager.AddMeshParameter("SeperatedMeshes", "SeperatedMeshes", "SeperatedMeshes", GH_ParamAccess.tree);
-            pManager.AddBrepParameter("brep", "brep", "brep", GH_ParamAccess.item);
+            pManager.AddMeshParameter("NonJoint", "SegMesh", "Non Joint Meshes", GH_ParamAccess.tree);
+            pManager.AddBrepParameter("BoundingBrep", "Br", "Bounding Box Brep", GH_ParamAccess.item);
             pManager.AddMeshParameter("JointMesh", "JointMesh", "JointMesh", GH_ParamAccess.list);
         }
 
@@ -109,7 +109,7 @@ namespace Chip.TimberParameter
             List<double> depthList= new List<double>();
             DataTree<Mesh> SeperatedShow = new DataTree<Mesh>();
 
-            double jointdepth = (-0.009).FromMeter();
+            double jointdepth = 0.009.FromMeter();
             int j = 0;
             //meshsegs = the list of meshes in each group
             foreach (List<Mesh> meshlists in meshsegs)
@@ -137,7 +137,7 @@ namespace Chip.TimberParameter
                     //z value of each mesh in the list
                     double depth = dupMsh.Vertices.Average(ver => ver.Z);
 
-                    if (depth < jointdepth)
+                    if (Math.Abs(depth) > jointdepth)
                     {
                         JointMeshes.Add(msh);
                         depthList.Add(depth);
@@ -160,7 +160,7 @@ namespace Chip.TimberParameter
 
             DA.SetDataTree(0, SeperatedShow);
             DA.SetData(1, boundingBrep);
-            DA.SetDataList(2, timberjoint.Face);
+            DA.SetDataList(2, JointMeshes);
             //DA.SetDataList(2, JointMeshes);
         }
 

@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using Chip.UnitHelper;
+using Chip.TimberContainer;
 
 namespace Chip.TimberParameter
 {
@@ -19,7 +20,7 @@ namespace Chip.TimberParameter
         /// new tabs/panels will automatically be created.
         /// </summary>
         public TimberCurve()
-          : base("TimberCurve", "TC", "Find Timber Center Curve", "Chip", "Parameter")
+          : base("TimberCurve", "TC", "Find Timber Center Curve", "Chip", "Geometry")
         {
         }
         //List<Curve> previewCurve = new List<Curve>();
@@ -38,10 +39,10 @@ namespace Chip.TimberParameter
         /// </summary>
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
-            pManager.AddCurveParameter("CenterSection", "CenterSection", "CenterSection", GH_ParamAccess.list);
-            pManager.AddGeometryParameter("section", "section", "section", GH_ParamAccess.list);
-            pManager.AddGeometryParameter("CenterCurve", "CenterCurve", "CenterCurve", GH_ParamAccess.list);
-            pManager.AddGeometryParameter("CenterAxis", "CenterAxis", "CenterAxis", GH_ParamAccess.item);
+            pManager.AddCurveParameter("SectionCenter", "SectionCenter", "SectionCenter", GH_ParamAccess.list);
+            pManager.AddGeometryParameter("Section", "Section", "Section", GH_ParamAccess.list);
+            //pManager.AddGeometryParameter("CenterCurve", "CenterCurve", "CenterCurve", GH_ParamAccess.list);
+            pManager.AddGeometryParameter("CenterCurve", "CenterCurve", "CenterCurve", GH_ParamAccess.item);
         }
 
         /// <summary>
@@ -51,13 +52,16 @@ namespace Chip.TimberParameter
         /// to store data in output parameters.</param>
         protected override void SolveInstance(IGH_DataAccess DA)
         {
-            
+            ReclaimedElement timber = new ReclaimedElement();
             List<Mesh> ScannedMeshes = new List<Mesh>();
             List<Mesh> SectionSides = new List<Mesh>();
             DA.GetDataList(0, ScannedMeshes);
             DA.GetDataList(1, SectionSides);
 
-            List<Point3d> contourPoints = new List<Point3d>();
+            timber.ScannedMesh = ScannedMeshes;
+
+            //Get Endpoints for contour direction
+            List<Point3d> contourEndPoints = new List<Point3d>();
             foreach (Mesh ss in SectionSides)
             {
                 BoundingBox bbox = ss.GetBoundingBox(false);
@@ -65,20 +69,26 @@ namespace Chip.TimberParameter
                 //Brep bbrep = Brep.CreateFromBox(bbox);
                 //Brep sectionFace = bbrep.Faces.OrderByDescending(f => AreaMassProperties.Compute(f, true, false, false, false).Area).First().ToBrep();
                 //Point3d p = AreaMassProperties.Compute(sectionFace,false,false,false,false).Centroid;
-                contourPoints.Add(p);
+                contourEndPoints.Add(p);
             }
-            Vector3d sectionVector = new Vector3d(contourPoints[1].X - contourPoints[0].X, contourPoints[1].Y - contourPoints[0].Y, contourPoints[1].Z - contourPoints[0].Z);
+
+            //move starting point a bit inward to get a closed section crv
+            Vector3d sectionVector = new Vector3d(contourEndPoints[1].X - contourEndPoints[0].X, contourEndPoints[1].Y - contourEndPoints[0].Y, contourEndPoints[1].Z - contourEndPoints[0].Z);
             sectionVector.Unitize();
             Transform movealongsection = Transform.Translation(sectionVector);
-            Point3d sectionstart = contourPoints[0];
+            Point3d sectionstart = contourEndPoints[0];
             sectionstart.Transform(movealongsection);
+
+            //make sure mesh is single
             Mesh JoinMesh = new Mesh();
             foreach (Mesh sm in ScannedMeshes)
             {
                 JoinMesh.Append(sm);
             }
+
+            //contour crv
             double contourDist = 0.02.FromMeter();
-            IEnumerable<Curve> contourcurves = Mesh.CreateContourCurves(JoinMesh, sectionstart, contourPoints[1], contourDist, 0.01).ToList();
+            IEnumerable<Curve> contourcurves = Mesh.CreateContourCurves(JoinMesh, sectionstart, contourEndPoints[1], contourDist, 0.01).ToList();
             List<Curve> contourCrv = Curve.JoinCurves(contourcurves, contourDist * 0.1, false).ToList();
 
             #region dunno
@@ -111,6 +121,7 @@ namespace Chip.TimberParameter
             //}
             #endregion
 
+            //center points of each section and order from closest to starting end
             List<Point3d> centers = new List<Point3d>();
             foreach (Curve crv in contourCrv)
             {
@@ -122,40 +133,45 @@ namespace Chip.TimberParameter
                 Point3d average = new Point3d(averageX, averageY, averageZ);
                 centers.Add(average);
             }
-            List<Point3d> orderedcenter = centers.OrderByDescending(cen => cen.DistanceTo(contourPoints[1])).ToList().ToList();
+            List<Point3d> orderedcenter = centers.OrderByDescending(cen => cen.DistanceTo(contourEndPoints[1])).ToList().ToList();
 
             bool jointstart = false;
             Vector3d lastvector = new Vector3d();
-            List<Polyline> centerCrv = new List<Polyline>();
-            List<Point3d> axisPoints = new List<Point3d>();
+            //List<Polyline> centerCrv = new List<Polyline>();
+            List<Point3d> axisPoints = new List<Point3d>();//points that are not out of range
+
             for (int i = 0; i < orderedcenter.Count; i++)
             {
-                Polyline pline = new Polyline();
+                //if it is the starting point, lastvector is the original vector that the next vector compares to
                 if (i == 0)
                 {
-                    Vector3d centerdirection = new Vector3d(contourPoints[0].X - orderedcenter[i + 1].X,
-                        contourPoints[0].Y - orderedcenter[i + 1].Y,
-                        contourPoints[0].Z - orderedcenter[i + 1].Z);
-                    pline.Add(contourPoints[0]);
-                    pline.Add(orderedcenter[i + 1]);
-                    axisPoints.Add(contourPoints[0]);
+                    Vector3d centerdirection = new Vector3d(contourEndPoints[0].X - orderedcenter[i + 1].X,
+                        contourEndPoints[0].Y - orderedcenter[i + 1].Y,
+                        contourEndPoints[0].Z - orderedcenter[i + 1].Z);
+
+                    axisPoints.Add(contourEndPoints[0]);
                     axisPoints.Add(orderedcenter[i + 1]);
-                    centerCrv.Add(pline);
+                    //centerCrv.Add(pline);
                     lastvector = centerdirection;
                 }
-                else if (i == orderedcenter.Count - 1)
+                else if (i == orderedcenter.Count - 1)//if it is the last point
                 {
-                    Vector3d centerdirection = new Vector3d(orderedcenter[i].X - contourPoints[1].X,
-                        orderedcenter[i].Y - contourPoints[1].Y,
-                        orderedcenter[i].Z - contourPoints[1].Z);
+                    Vector3d centerdirection = new Vector3d(orderedcenter[i].X - contourEndPoints[1].X,
+                        orderedcenter[i].Y - contourEndPoints[1].Y,
+                        orderedcenter[i].Z - contourEndPoints[1].Z);
 
+                    double anglediffer = Vector3d.VectorAngle(lastvector, centerdirection);
+                    if (Math.Abs(anglediffer) > 0.1)
+                    {
 
-                    pline.Add(orderedcenter[i]);
-                    pline.Add(contourPoints[1]);
-                    axisPoints.Add(orderedcenter[i]);
-                    axisPoints.Add(contourPoints[1]);
-                    centerCrv.Add(pline);
-                    lastvector = centerdirection;
+                        axisPoints.Add(contourEndPoints[1]);
+                    }
+                    else
+                    {
+                        axisPoints.Add(orderedcenter[i]);
+                        axisPoints.Add(contourEndPoints[1]);
+                        //centerCrv.Add(pline);
+                    }
 
                 }
 
@@ -164,19 +180,21 @@ namespace Chip.TimberParameter
                     Vector3d centerdirection = new Vector3d(orderedcenter[i].X - orderedcenter[i + 1].X,
                         orderedcenter[i].Y - orderedcenter[i + 1].Y,
                         orderedcenter[i].Z - orderedcenter[i + 1].Z);
+
                     double anglediffer = Vector3d.VectorAngle(lastvector, centerdirection);
-                    if (anglediffer > 0.3 && jointstart == false)
+
+                    //if the angle is larger than 0.1 and it is the first different vector, then skip 
+                    if (Math.Abs(anglediffer) > 0.1 && jointstart == false)
                     {
                         jointstart = true;
                         lastvector = centerdirection;
                         continue;
 
-
                     }
                     else if (jointstart)
                     {
-                        //maybe future change the difference to double the angle of the first tilted vector
-                        if (anglediffer > 1.04)
+                        //if it is the end of the different vector then skip and go back to comparing with normal vector
+                        if (Math.Abs(anglediffer) > 0.1)
                         {
                             jointstart = false;
                             lastvector = new Vector3d(orderedcenter[i + 1].X - orderedcenter[i + 2].X,
@@ -185,13 +203,12 @@ namespace Chip.TimberParameter
                         }
                         continue;
                     }
+                    //if its the same vector and it has the same vector as the starting vector, then add point
                     else
                     {
-                        pline.Add(orderedcenter[i]);
-                        pline.Add(orderedcenter[i + 1]);
                         axisPoints.Add(orderedcenter[i]);
                         axisPoints.Add(orderedcenter[i + 1]);
-                        centerCrv.Add(pline);
+                        //centerCrv.Add(pline);
                         lastvector = centerdirection;
                     }
 
@@ -205,14 +222,14 @@ namespace Chip.TimberParameter
                 Polyline pline = new Polyline();
                 if (i == 0)
                 {
-                    pline.Add(contourPoints[0]);
+                    pline.Add(contourEndPoints[0]);
                     pline.Add(orderedcenter[i + 1]);
                     polylines.Add(pline);
                 }
                 else if (i == orderedcenter.Count - 1)
                 {
                     pline.Add(orderedcenter[i]);
-                    pline.Add(contourPoints[1]);
+                    pline.Add(contourEndPoints[1]);
                     polylines.Add(pline);
                 }
 
@@ -230,12 +247,12 @@ namespace Chip.TimberParameter
                 centeraxis.Add(aP);
             }
             //previewCurve.AddRange(contourCrv);
-
+            timber.Centerline = centeraxis;
 
             DA.SetDataList(0, polylines);
             DA.SetDataList(1, contourCrv);
-            DA.SetDataList(2, centerCrv);
-            DA.SetData(3, centeraxis);
+            //DA.SetDataList(2, centerCrv);
+            DA.SetData(2, centeraxis);
 
         }
 

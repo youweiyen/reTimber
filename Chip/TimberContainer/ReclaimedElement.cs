@@ -13,7 +13,7 @@ namespace Chip.TimberContainer
         /// <summary>
         /// closed mesh of scanned timber
         /// </summary>
-        public Mesh ScannedMesh { get; set; }
+        public List<Mesh> ScannedMesh { get; set; }
         /// <summary>
         /// seperated mesh of scanned timber
         /// </summary>

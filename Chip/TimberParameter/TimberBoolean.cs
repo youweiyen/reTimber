@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 
+using Grasshopper;
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Data;
 using Grasshopper.Kernel.Types;
@@ -25,7 +27,7 @@ namespace Chip.TimberParameter
 
         private List<Line> l_ = new List<Line>();
 
-        private BoundingBox bbox_ = BoundingBox.get_Unset();
+        private BoundingBox bbox_ = BoundingBox.Unset;
 
         public override GH_Exposure Exposure => (GH_Exposure)16;
 
@@ -34,30 +36,30 @@ namespace Chip.TimberParameter
         {
             m_ = new Mesh();
             l_ = new List<Line>();
-            bbox_ = BoundingBox.get_Unset();
+            bbox_ = BoundingBox.Unset;
         }
 
         public override void DrawViewportMeshes(IGH_PreviewArgs args)
         {
-            if (!((GH_Component)this).get_Hidden() && !((GH_ActiveObject)this).get_Locked() && m_ != null)
+            if (!((GH_Component)this).Hidden && !((GH_ActiveObject)this).Locked && m_ != null)
             {
-                args.get_Display().DrawMeshFalseColors(m_);
+                args.Display.DrawMeshFalseColors(m_);
             }
         }
 
         public override void DrawViewportWires(IGH_PreviewArgs args)
         {
-            bool previewMeshEdges = CentralSettings.get_PreviewMeshEdges();
-            Color color = (((GH_DocumentObject)this).get_Attributes().get_Selected() ? args.get_WireColour_Selected() : args.get_WireColour());
-            if (!((GH_Component)this).get_Hidden() && !((GH_ActiveObject)this).get_Locked() && m_ != null)
+            bool previewMeshEdges = CentralSettings.PreviewMeshEdges;
+            Color color = (((GH_DocumentObject)this).Attributes.Selected ? args.WireColour_Selected : args.WireColour);
+            if (!((GH_Component)this).Hidden && !((GH_ActiveObject)this).Locked && m_ != null)
             {
                 if (l_.Count == 0 && previewMeshEdges)
                 {
-                    args.get_Display().DrawMeshWires(m_, color);
+                    args.Display.DrawMeshWires(m_, color);
                 }
                 else
                 {
-                    args.get_Display().DrawLines((IEnumerable<Line>)l_, Color.Black, 2);
+                    args.Display.DrawLines((IEnumerable<Line>)l_, Color.Black, 2);
                 }
             }
         }
@@ -72,10 +74,10 @@ namespace Chip.TimberParameter
             pManager.AddNumberParameter("Scale", "S", "Scale cutters", (GH_ParamAccess)0, 1.0);
             pManager.AddColourParameter("Color", "C", "Color for cuts", (GH_ParamAccess)0);
             pManager.AddBooleanParameter("Edges", "E", "Show sharp mesh edge", (GH_ParamAccess)0, false);
-            ((GH_ParamManager)pManager).get_Param(1).set_Optional(true);
-            ((GH_ParamManager)pManager).get_Param(2).set_Optional(true);
-            ((GH_ParamManager)pManager).get_Param(4).set_Optional(true);
-            ((GH_ParamManager)pManager).get_Param(5).set_Optional(true);
+            pManager[1].Optional= true;
+            pManager[2].Optional= true;
+            pManager[4].Optional= true;
+            pManager[5].Optional= true;
         }
 
         /// <summary>
@@ -94,8 +96,8 @@ namespace Chip.TimberParameter
             new Random();
             GH_Structure<GH_Mesh> val = new GH_Structure<GH_Mesh>();
             GH_Structure<GH_Mesh> val2 = new GH_Structure<GH_Mesh>();
-            DA.GetDataTree<GH_Mesh>(0, ref val);
-            DA.GetDataTree<GH_Mesh>(1, ref val2);
+            DA.GetDataTree<GH_Mesh>(0, out val);
+            DA.GetDataTree<GH_Mesh>(1, out val2);
             int num = 0;
             DA.GetData<int>(2, ref num);
             double num2 = 1.001;
@@ -110,17 +112,18 @@ namespace Chip.TimberParameter
             }
             DataTree<Mesh> val3 = new DataTree<Mesh>();
             BoundingBox boundingBox;
-            for (int i = 0; i < val.get_PathCount(); i++)
+            for (int i = 0; i < val.PathCount; i++)
             {
-                GH_Path val4 = val.get_Paths()[i];
-                val3.Add(((GH_Goo<Mesh>)(object)val.get_DataItem(val4, 0)).get_Value(), val4);
+                GH_Path val4 = val.Paths[i];
+                val3.Add(((GH_Goo<Mesh>)(object)val.get_DataItem(val4, 0)).Value, val4);
                 if (!val2.PathExists(val4))
                 {
                     continue;
                 }
+                
                 new HashSet<Point3d>();
                 List<GH_Mesh> list = new List<GH_Mesh>();
-                foreach (GH_Mesh item in val2.get_DataList(val4))
+                foreach (GH_Mesh item in val2[val4])
                 {
                     if (item != null)
                     {
@@ -129,31 +132,31 @@ namespace Chip.TimberParameter
                 }
                 for (int j = 0; j < list.Count; j++)
                 {
-                    Mesh obj = ((GH_Goo<Mesh>)(object)list[j]).get_Value().DuplicateMesh();
+                    Mesh obj = ((GH_Goo<Mesh>)(object)list[j]).Value.DuplicateMesh();
                     boundingBox = ((GeometryBase)obj).GetBoundingBox(true);
-                    ((GeometryBase)obj).Transform(Transform.Scale(((BoundingBox)(ref boundingBox)).get_Center(), num2));
+                    ((GeometryBase)obj).Transform(Transform.Scale(((BoundingBox)(boundingBox)).Center, num2));
                     Mesh val5 = obj;
                     val3.Add(val5, val4);
                 }
             }
             DataTree<Mesh> val6 = new DataTree<Mesh>();
-            for (int k = 0; k < val3.get_BranchCount(); k++)
+            for (int k = 0; k < val3.BranchCount; k++)
             {
-                GH_Path val7 = val3.get_Paths()[k];
+                GH_Path val7 = val3.Paths[k];
                 List<Mesh> list2 = val3.Branch(val7);
                 if (list2.Count == 1)
                 {
                     Mesh val8 = list2[0].DuplicateMesh();
                     val8.Unweld(0.0, true);
-                    val8.get_VertexColors().CreateMonotoneMesh(Color.FromArgb(200, 200, 200));
+                    val8.VertexColors.CreateMonotoneMesh(Color.FromArgb(200, 200, 200));
                     m_.Append(val8);
                     if (flag)
                     {
                         l_.AddRange(MeshEdgesByAngle(val8, 0.37));
                     }
-                    if (((BoundingBox)(ref bbox_)).get_IsValid())
+                    if (((BoundingBox)(bbox_)).IsValid)
                     {
-                        ((BoundingBox)(ref bbox_)).Union(((GeometryBase)m_).GetBoundingBox(false));
+                        ((BoundingBox)(bbox_)).Union(((GeometryBase)m_).GetBoundingBox(false));
                     }
                     else
                     {
@@ -165,7 +168,7 @@ namespace Chip.TimberParameter
                 try
                 {
                     Mesh val9 = (flag2 ? TestCGAL.CreateMeshBooleanArrayTrackColors(list2.ToArray(), white, Math.Abs(num)) : TestCGAL.CreateMeshBooleanArray(list2.ToArray(), Math.Abs(num)));
-                    if (!((CommonObject)val9).get_IsValid())
+                    if (!((CommonObject)val9).IsValid)
                     {
                         continue;
                     }
@@ -178,8 +181,8 @@ namespace Chip.TimberParameter
                         {
                             int num3 = l;
                             boundingBox = ((GeometryBase)array[l]).GetBoundingBox(false);
-                            Vector3d diagonal = ((BoundingBox)(ref boundingBox)).get_Diagonal();
-                            array2[num3] = ((Vector3d)(ref diagonal)).get_Length();
+                            Vector3d diagonal = ((BoundingBox)(boundingBox)).Diagonal;
+                            array2[num3] = ((Vector3d)(diagonal)).Length;
                         }
                         Array.Sort(array2, array);
                     }
@@ -189,16 +192,16 @@ namespace Chip.TimberParameter
                     }
                     if (!flag2)
                     {
-                        array[array.Length - 1].get_VertexColors().CreateMonotoneMesh(Color.FromArgb(200, 200, 200));
+                        array[array.Length - 1].VertexColors.CreateMonotoneMesh(Color.FromArgb(200, 200, 200));
                     }
                     m_.Append(array[array.Length - 1]);
                     if (flag)
                     {
                         l_.AddRange(MeshEdgesByAngle(array[array.Length - 1], 0.37));
                     }
-                    if (((BoundingBox)(ref bbox_)).get_IsValid())
+                    if (((BoundingBox)(bbox_)).IsValid)
                     {
-                        ((BoundingBox)(ref bbox_)).Union(((GeometryBase)m_).GetBoundingBox(false));
+                        ((BoundingBox)(bbox_)).Union(((GeometryBase)m_).GetBoundingBox(false));
                     }
                     else
                     {
@@ -216,20 +219,15 @@ namespace Chip.TimberParameter
 
         public List<Line> MeshEdgesByAngle(Mesh mesh, double d = 0.49)
         {
-            //IL_003c: Unknown result type (might be due to invalid IL or missing references)
-            //IL_0041: Unknown result type (might be due to invalid IL or missing references)
-            //IL_004f: Unknown result type (might be due to invalid IL or missing references)
-            //IL_0054: Unknown result type (might be due to invalid IL or missing references)
-            //IL_0095: Unknown result type (might be due to invalid IL or missing references)
             List<Line> list = new List<Line>();
-            mesh.get_FaceNormals().ComputeFaceNormals();
-            MeshTopologyEdgeList topologyEdges = mesh.get_TopologyEdges();
-            for (int i = 0; i < mesh.get_TopologyEdges().get_Count(); i++)
+            mesh.FaceNormals.ComputeFaceNormals();
+            MeshTopologyEdgeList topologyEdges = mesh.TopologyEdges;
+            for (int i = 0; i < mesh.TopologyEdges.Count; i++)
             {
-                int[] connectedFaces = mesh.get_TopologyEdges().GetConnectedFaces(i);
+                int[] connectedFaces = mesh.TopologyEdges.GetConnectedFaces(i);
                 if (connectedFaces.Length == 2)
                 {
-                    double num = Vector3d.VectorAngle(Vector3d.op_Implicit(mesh.get_FaceNormals().get_Item(connectedFaces[0])), Vector3d.op_Implicit(mesh.get_FaceNormals().get_Item(connectedFaces[1])));
+                    double num = Vector3d.VectorAngle(mesh.FaceNormals[connectedFaces[0]], mesh.FaceNormals[connectedFaces[1]]);
                     if (num > (0.5 - d) * 3.14159265359 && num < (0.5 + d) * 3.14159265359)
                     {
                         list.Add(topologyEdges.EdgeLine(i));
@@ -238,7 +236,7 @@ namespace Chip.TimberParameter
             }
             return list;
         }
-
+        
         /// <summary>
         /// Provides an Icon for the component.
         /// </summary>
