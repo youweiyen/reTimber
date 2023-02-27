@@ -51,8 +51,8 @@ namespace Chip.TimberParameter
         protected override void SolveInstance(IGH_DataAccess DA)
         {
             ReclaimedElement timber = new ReclaimedElement();
-            List<Mesh> meshFaces = timber.SegmentedMesh;
-            //List<Mesh> meshFaces = new List<Mesh>;
+            //List<Mesh> meshFaces = timber.SegmentedMesh;
+            List<Mesh> meshFaces = new List<Mesh>();
             Curve centerAxis = null;
             DA.GetDataList(0, meshFaces);
             DA.GetData(1, ref centerAxis);
@@ -74,6 +74,8 @@ namespace Chip.TimberParameter
             boundingBrep.Transform(orient);
             //Add to timber
             timber.Boundary = boundingBrep;
+            timber.SegmentedMesh = meshFaces;
+
 
             //get the surfaces that are the same normal to each faces of the brep
             //Bounding Brep Normal
@@ -98,13 +100,15 @@ namespace Chip.TimberParameter
                 Vector3d closestItem = brepfacenormals.OrderByDescending(fc => (faceNormal - fc).Length).Last();
                 int closest = brepfacenormals.IndexOf(closestItem);
                 directionMeshes[closest].Add(mF);
-                timber.Normal.Add(faceNormal);
+                //timber.Normal.Add(faceNormal);
             }
+
 
             //For each group of normals, find the largest surface there is to set as the timber surface
             Dictionary<int, List<Mesh>>.ValueCollection meshsegs = directionMeshes.Values;
             Joint timberjoint = new Joint();
-            //List<Mesh> JointMeshes = new List<Mesh>();
+            List<Mesh> JointMeshes = new List<Mesh>();
+            List<double> depthList= new List<double>();
             DataTree<Mesh> SeperatedShow = new DataTree<Mesh>();
 
             double jointdepth = (-0.009).FromMeter();
@@ -137,9 +141,8 @@ namespace Chip.TimberParameter
 
                     if (depth < jointdepth)
                     {
-                        timberjoint.Face.Add(msh);
-                        //JointMeshes.Add(msh);
-                        timberjoint.Depth.Add(depth);
+                        JointMeshes.Add(msh);
+                        depthList.Add(depth);
                     }
                 }
                 //for showing in datatree
@@ -151,7 +154,11 @@ namespace Chip.TimberParameter
                 j++;
             }
 
-            timber.Joint.Add(timberjoint);
+            //add to timber container
+            timberjoint.Face = JointMeshes;
+            timberjoint.Depth = depthList;
+            List<Joint> timberJoints = new List<Joint> { timberjoint };
+            timber.Joint = timberJoints;
 
             DA.SetDataTree(0, SeperatedShow);
             DA.SetData(1, boundingBrep);

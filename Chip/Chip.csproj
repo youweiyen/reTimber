@@ -26,7 +26,9 @@
   </PropertyGroup>
   
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="Copy &quot;$(TargetPath)&quot; &quot;$(TargetDir)$(ProjectName).gha&quot;&#xD;&#xA;Copy &quot;$(TargetPath)&quot; &quot;C:\Users\$(Username)\AppData\Roaming\Grasshopper\Libraries\$(ProjectName)\$(ProjectName).gha&quot;&#xD;&#xA;echo &quot;Build =&gt; $(SolutionDir) To =&gt; $(TargetDir)&quot;" />
+    <Exec Command="Copy &quot;$(TargetPath)&quot; &quot;$(TargetDir)$(ProjectName).gha&quot;&#xD;&#xA;Copy &quot;$(TargetPath)&quot; &quot;C:\Users\$(Username)\AppData\Roaming\Grasshopper\Libraries\$(ProjectName).gha&quot;&#xD;&#xA;echo &quot;Build =&gt; $(SolutionDir) To =&gt; $(TargetDir)&quot;" />
   </Target>
+  
+  
 
 </Project>
