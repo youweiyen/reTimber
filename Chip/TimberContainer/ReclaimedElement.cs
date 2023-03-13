@@ -38,6 +38,10 @@ namespace Chip.TimberContainer
         /// normal of every timber surface
         /// </summary>
         public List<Vector3d> Normal { get; set; }
+        /// <summary>
+        /// Plane origin of Reclaimed Timber
+        /// </summary>
+        public Plane Plane { get; set; }
 
 
     }

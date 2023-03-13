@@ -7,7 +7,7 @@ using Rhino.Geometry;
 
 namespace Chip.TimberContainer
 {
-    public class Joint: ReclaimedElement
+    public class Joint
     {
         /// <summary>
         /// Joint base plane
@@ -25,6 +25,10 @@ namespace Chip.TimberContainer
         /// joint meshes
         /// </summary>
         public List<Mesh> Face { get; set; }
+        /// <summary>
+        /// The bounding box of joint meshes since they are not perfectly whole after scan and segmentation
+        /// </summary>
+        public BoundingBox BoundingBox { get; set; }
 
         //public Joint()
         //{

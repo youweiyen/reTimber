@@ -135,24 +135,31 @@ namespace Chip.TimberParameter
             }
             List<Point3d> orderedcenter = centers.OrderByDescending(cen => cen.DistanceTo(contourEndPoints[1])).ToList().ToList();
 
-            bool jointstart = false;
+            //move starting point a bit outward to get a first direction vector
+            Point3d directionstart = contourEndPoints[0];
+            Vector3d initialvector = orderedcenter[1] - orderedcenter[0];
+            Transform movealongdirection = Transform.Translation(initialvector);
+            directionstart.Transform(movealongdirection);
+
+            //bool jointstart = false;
+            jointstart jointstart = jointstart.end;
             Vector3d lastvector = new Vector3d();
             //List<Polyline> centerCrv = new List<Polyline>();
             List<Point3d> axisPoints = new List<Point3d>();//points that are not out of range
 
             for (int i = 0; i < orderedcenter.Count; i++)
             {
-                //if it is the starting point, lastvector is the original vector that the next vector compares to
+                //if it is the starting point, lastvector is the initial vector that the next vector compares to
                 if (i == 0)
                 {
-                    Vector3d centerdirection = new Vector3d(contourEndPoints[0].X - orderedcenter[i + 1].X,
-                        contourEndPoints[0].Y - orderedcenter[i + 1].Y,
-                        contourEndPoints[0].Z - orderedcenter[i + 1].Z);
+                    Vector3d initialdirection = new Vector3d(directionstart.X - orderedcenter[i].X,
+                        directionstart.Y - orderedcenter[i].Y,
+                        directionstart.Z - orderedcenter[i].Z);
 
                     axisPoints.Add(contourEndPoints[0]);
-                    axisPoints.Add(orderedcenter[i + 1]);
+                    //axisPoints.Add(orderedcenter[i + 1]);
                     //centerCrv.Add(pline);
-                    lastvector = centerdirection;
+                    lastvector = initialdirection;
                 }
                 else if (i == orderedcenter.Count - 1)//if it is the last point
                 {
@@ -163,7 +170,6 @@ namespace Chip.TimberParameter
                     double anglediffer = Vector3d.VectorAngle(lastvector, centerdirection);
                     if (Math.Abs(anglediffer) > 0.1)
                     {
-
                         axisPoints.Add(contourEndPoints[1]);
                     }
                     else
@@ -177,39 +183,63 @@ namespace Chip.TimberParameter
 
                 else
                 {
-                    Vector3d centerdirection = new Vector3d(orderedcenter[i].X - orderedcenter[i + 1].X,
+                    Vector3d thisdirection = new Vector3d(orderedcenter[i].X - orderedcenter[i + 1].X,
                         orderedcenter[i].Y - orderedcenter[i + 1].Y,
                         orderedcenter[i].Z - orderedcenter[i + 1].Z);
 
-                    double anglediffer = Vector3d.VectorAngle(lastvector, centerdirection);
-
+                    double anglediffer = Vector3d.VectorAngle(lastvector, thisdirection);
+                    
                     //if the angle is larger than 0.1 and it is the first different vector, then skip 
-                    if (Math.Abs(anglediffer) > 0.1 && jointstart == false)
+                    if (Math.Abs(anglediffer) > 0.1 && jointstart == jointstart.end)
                     {
-                        jointstart = true;
-                        lastvector = centerdirection;
+                        jointstart = jointstart.start;
+                        lastvector = thisdirection;
                         continue;
 
                     }
-                    else if (jointstart)
+                    else if (jointstart == jointstart.start)
                     {
-                        //if it is the end of the different vector then skip and go back to comparing with normal vector
-                        if (Math.Abs(anglediffer) > 0.1)
+                        if(Math.Abs(anglediffer) > 0.1)
                         {
-                            jointstart = false;
-                            lastvector = new Vector3d(orderedcenter[i + 1].X - orderedcenter[i + 2].X,
-                        orderedcenter[i + 1].Y - orderedcenter[i + 2].Y,
-                        orderedcenter[i + 1].Z - orderedcenter[i + 2].Z);
+                            jointstart = jointstart.middle;
+                            lastvector = new Vector3d(orderedcenter[i].X - orderedcenter[i + 1].X,
+                        orderedcenter[i].Y - orderedcenter[i + 1].Y,
+                        orderedcenter[i].Z - orderedcenter[i + 1].Z);
+                            continue;
                         }
-                        continue;
+
+                        ////if it is the end of the different vector then skip and go back to comparing with normal vector
+                        //if (Math.Abs(anglediffer) > 0.1)
+                        //{
+                        //    jointstart = jointstart.middle;
+                        //    lastvector = new Vector3d(orderedcenter[i + 1].X - orderedcenter[i + 2].X,
+                        //orderedcenter[i + 1].Y - orderedcenter[i + 2].Y,
+                        //orderedcenter[i + 1].Z - orderedcenter[i + 2].Z);
+                        //}
+                    }
+                    else if (jointstart == jointstart.middle)
+                    {
+                        if(Math.Abs(anglediffer) > 0.1)
+                        {
+                            jointstart = jointstart.end;
+                        //    lastvector = new Vector3d(orderedcenter[i].X - orderedcenter[i + 1].X,
+                        //orderedcenter[i].Y - orderedcenter[i + 1].Y,
+                        //orderedcenter[i].Z - orderedcenter[i + 1].Z);
+                            continue;
+                        }
+                        else
+                        {
+                            continue;
+                        }
+
                     }
                     //if its the same vector and it has the same vector as the starting vector, then add point
                     else
                     {
                         axisPoints.Add(orderedcenter[i]);
-                        axisPoints.Add(orderedcenter[i + 1]);
+                        //axisPoints.Add(orderedcenter[i + 1]);
                         //centerCrv.Add(pline);
-                        lastvector = centerdirection;
+                        lastvector = thisdirection;
                     }
 
                 }
@@ -255,7 +285,7 @@ namespace Chip.TimberParameter
             DA.SetData(2, centeraxis);
 
         }
-
+        #region Preview
         //preview
         //public override void DrawViewportMeshes(IGH_PreviewArgs args)
         //{
@@ -271,8 +301,13 @@ namespace Chip.TimberParameter
 
         //    }
         //}
-
-
+        #endregion
+        public enum jointstart
+        {
+            start = 0,
+            middle = 1,
+            end = 2,
+        }
         /// <summary>
         /// Provides an Icon for every component that will be visible in the User Interface.
         /// Icons need to be 24x24 pixels.
