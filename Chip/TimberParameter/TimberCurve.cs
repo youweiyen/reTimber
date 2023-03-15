@@ -73,7 +73,9 @@ namespace Chip.TimberParameter
             }
 
             //move starting point a bit inward to get a closed section crv
-            Vector3d sectionVector = new Vector3d(contourEndPoints[1].X - contourEndPoints[0].X, contourEndPoints[1].Y - contourEndPoints[0].Y, contourEndPoints[1].Z - contourEndPoints[0].Z);
+            Vector3d sectionVector = new Vector3d(contourEndPoints[1].X - contourEndPoints[0].X,
+                contourEndPoints[1].Y - contourEndPoints[0].Y,
+                contourEndPoints[1].Z - contourEndPoints[0].Z);//0 to 1 direction
             sectionVector.Unitize();
             Transform movealongsection = Transform.Translation(sectionVector);
             Point3d sectionstart = contourEndPoints[0];
@@ -137,7 +139,10 @@ namespace Chip.TimberParameter
 
             //move starting point a bit outward to get a first direction vector
             Point3d directionstart = contourEndPoints[0];
-            Vector3d initialvector = orderedcenter[1] - orderedcenter[0];
+            Vector3d initialvector = new Vector3d(contourEndPoints[0].X - contourEndPoints[1].X, 
+                contourEndPoints[0].Y - contourEndPoints[1].Y, 
+                contourEndPoints[0].Z - contourEndPoints[1].Z);
+            initialvector.Unitize();
             Transform movealongdirection = Transform.Translation(initialvector);
             directionstart.Transform(movealongdirection);
 
@@ -146,29 +151,34 @@ namespace Chip.TimberParameter
             Vector3d lastvector = new Vector3d();
             //List<Polyline> centerCrv = new List<Polyline>();
             List<Point3d> axisPoints = new List<Point3d>();//points that are not out of range
+            double angleTolerance = 0.1;
 
             for (int i = 0; i < orderedcenter.Count; i++)
             {
                 //if it is the starting point, lastvector is the initial vector that the next vector compares to
                 if (i == 0)
                 {
-                    Vector3d initialdirection = new Vector3d(directionstart.X - orderedcenter[i].X,
-                        directionstart.Y - orderedcenter[i].Y,
-                        directionstart.Z - orderedcenter[i].Z);
-
                     axisPoints.Add(contourEndPoints[0]);
-                    //axisPoints.Add(orderedcenter[i + 1]);
+
                     //centerCrv.Add(pline);
-                    lastvector = initialdirection;
+                    //lastvector = new Vector3d(contourEndPoints[0].X - directionstart.X,
+                    //    contourEndPoints[0].Y - directionstart.Y,
+                    //    contourEndPoints[0].Z - directionstart.Z);
+                    lastvector = new Vector3d(orderedcenter[0].X - contourEndPoints[0].X,
+                        orderedcenter[0].Y - contourEndPoints[0].Y,
+                        orderedcenter[0].Z - contourEndPoints[0].Z);
                 }
                 else if (i == orderedcenter.Count - 1)//if it is the last point
                 {
-                    Vector3d centerdirection = new Vector3d(orderedcenter[i].X - contourEndPoints[1].X,
-                        orderedcenter[i].Y - contourEndPoints[1].Y,
-                        orderedcenter[i].Z - contourEndPoints[1].Z);
+                    //Vector3d thisdirection = new Vector3d(orderedcenter[i].X - contourEndPoints[1].X,
+                    //    orderedcenter[i].Y - contourEndPoints[1].Y,
+                    //    orderedcenter[i].Z - contourEndPoints[1].Z);
+                    Vector3d thisdirection = new Vector3d(contourEndPoints[1].X - orderedcenter[i].X,
+                        contourEndPoints[1].Y - orderedcenter[i].Y,
+                        contourEndPoints[1].Z - orderedcenter[i].Z);
 
-                    double anglediffer = Vector3d.VectorAngle(lastvector, centerdirection);
-                    if (Math.Abs(anglediffer) > 0.1)
+                    double anglediffer = Vector3d.VectorAngle(lastvector, thisdirection);
+                    if (Math.Abs(anglediffer) > angleTolerance)
                     {
                         axisPoints.Add(contourEndPoints[1]);
                     }
@@ -178,58 +188,55 @@ namespace Chip.TimberParameter
                         axisPoints.Add(contourEndPoints[1]);
                         //centerCrv.Add(pline);
                     }
-
                 }
 
                 else
                 {
-                    Vector3d thisdirection = new Vector3d(orderedcenter[i].X - orderedcenter[i + 1].X,
-                        orderedcenter[i].Y - orderedcenter[i + 1].Y,
-                        orderedcenter[i].Z - orderedcenter[i + 1].Z);
+                    Vector3d thisdirection = new Vector3d(orderedcenter[i].X - orderedcenter[i - 1].X,
+                        orderedcenter[i].Y - orderedcenter[i - 1].Y,
+                        orderedcenter[i].Z - orderedcenter[i - 1].Z);
+                    //Vector3d thisdirection = new Vector3d(orderedcenter[i].X - orderedcenter[i + 1].X,
+                    //    orderedcenter[i].Y - orderedcenter[i + 1].Y,
+                    //    orderedcenter[i].Z - orderedcenter[i + 1].Z);
 
                     double anglediffer = Vector3d.VectorAngle(lastvector, thisdirection);
                     
                     //if the angle is larger than 0.1 and it is the first different vector, then skip 
-                    if (Math.Abs(anglediffer) > 0.1 && jointstart == jointstart.end)
+                    if (Math.Abs(anglediffer) > angleTolerance && jointstart == jointstart.end)
                     {
                         jointstart = jointstart.start;
                         lastvector = thisdirection;
-                        continue;
 
                     }
                     else if (jointstart == jointstart.start)
                     {
-                        if(Math.Abs(anglediffer) > 0.1)
+                        if(Math.Abs(anglediffer) > angleTolerance)
                         {
                             jointstart = jointstart.middle;
-                            lastvector = new Vector3d(orderedcenter[i].X - orderedcenter[i + 1].X,
-                        orderedcenter[i].Y - orderedcenter[i + 1].Y,
-                        orderedcenter[i].Z - orderedcenter[i + 1].Z);
-                            continue;
+                            //    lastvector = new Vector3d(orderedcenter[i+1].X - orderedcenter[i].X,
+                            //orderedcenter[i + 1].Y - orderedcenter[i].Y,
+                            //orderedcenter[i + 1].Z - orderedcenter[i].Z);
+                            lastvector = new Vector3d(orderedcenter[i].X - orderedcenter[i - 1].X,
+                                orderedcenter[i].Y - orderedcenter[i - 1].Y,
+                                orderedcenter[i].Z - orderedcenter[i - 1].Z);
+                            
                         }
 
-                        ////if it is the end of the different vector then skip and go back to comparing with normal vector
-                        //if (Math.Abs(anglediffer) > 0.1)
-                        //{
-                        //    jointstart = jointstart.middle;
-                        //    lastvector = new Vector3d(orderedcenter[i + 1].X - orderedcenter[i + 2].X,
-                        //orderedcenter[i + 1].Y - orderedcenter[i + 2].Y,
-                        //orderedcenter[i + 1].Z - orderedcenter[i + 2].Z);
-                        //}
+                        //if it is the end of the different vector then skip and go back to comparing with normal vector
+
                     }
                     else if (jointstart == jointstart.middle)
                     {
-                        if(Math.Abs(anglediffer) > 0.1)
+                        if(Math.Abs(anglediffer) > angleTolerance)
                         {
                             jointstart = jointstart.end;
-                        //    lastvector = new Vector3d(orderedcenter[i].X - orderedcenter[i + 1].X,
-                        //orderedcenter[i].Y - orderedcenter[i + 1].Y,
-                        //orderedcenter[i].Z - orderedcenter[i + 1].Z);
-                            continue;
-                        }
-                        else
-                        {
-                            continue;
+                            //lastvector = new Vector3d(orderedcenter[i + 1].X - orderedcenter[i].X,
+                            //    orderedcenter[i + 1].Y - orderedcenter[i].Y,
+                            //    orderedcenter[i + 1].Z - orderedcenter[i].Z);
+                            lastvector = new Vector3d(orderedcenter[i+1].X - orderedcenter[i].X,
+                        orderedcenter[i+1].Y - orderedcenter[i].Y,
+                        orderedcenter[i + 1].Z - orderedcenter[i].Z);
+                            
                         }
 
                     }
@@ -237,7 +244,6 @@ namespace Chip.TimberParameter
                     else
                     {
                         axisPoints.Add(orderedcenter[i]);
-                        //axisPoints.Add(orderedcenter[i + 1]);
                         //centerCrv.Add(pline);
                         lastvector = thisdirection;
                     }
@@ -262,7 +268,6 @@ namespace Chip.TimberParameter
                     pline.Add(contourEndPoints[1]);
                     polylines.Add(pline);
                 }
-
                 else
                 {
                     pline.Add(orderedcenter[i]);
