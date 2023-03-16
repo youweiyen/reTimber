@@ -135,16 +135,29 @@ namespace Chip.TimberParameter
                 Point3d average = new Point3d(averageX, averageY, averageZ);
                 centers.Add(average);
             }
+            //Remove duplicate points
+            for (int i = 0 ; i < centers.Count; i++)
+            {
+                for(int j = centers.Count - 1; j > i; j--)
+                {
+                    double dupDist = centers[i].DistanceTo(centers[j]);
+                    if(dupDist < 0.0001.FromMeter())
+                    {
+                        centers.RemoveAt(j);
+                    }
+                }
+            }
+
             List<Point3d> orderedcenter = centers.OrderByDescending(cen => cen.DistanceTo(contourEndPoints[1])).ToList().ToList();
 
-            //move starting point a bit outward to get a first direction vector
-            Point3d directionstart = contourEndPoints[0];
-            Vector3d initialvector = new Vector3d(contourEndPoints[0].X - contourEndPoints[1].X, 
-                contourEndPoints[0].Y - contourEndPoints[1].Y, 
-                contourEndPoints[0].Z - contourEndPoints[1].Z);
-            initialvector.Unitize();
-            Transform movealongdirection = Transform.Translation(initialvector);
-            directionstart.Transform(movealongdirection);
+            ////move starting point a bit outward to get a first direction vector
+            //Point3d directionstart = contourEndPoints[0];
+            //Vector3d initialvector = new Vector3d(contourEndPoints[0].X - contourEndPoints[1].X, 
+            //    contourEndPoints[0].Y - contourEndPoints[1].Y, 
+            //    contourEndPoints[0].Z - contourEndPoints[1].Z);
+            //initialvector.Unitize();
+            //Transform movealongdirection = Transform.Translation(initialvector);
+            //directionstart.Transform(movealongdirection);
 
             //bool jointstart = false;
             jointstart jointstart = jointstart.end;
@@ -234,9 +247,8 @@ namespace Chip.TimberParameter
                             //    orderedcenter[i + 1].Y - orderedcenter[i].Y,
                             //    orderedcenter[i + 1].Z - orderedcenter[i].Z);
                             lastvector = new Vector3d(orderedcenter[i+1].X - orderedcenter[i].X,
-                        orderedcenter[i+1].Y - orderedcenter[i].Y,
-                        orderedcenter[i + 1].Z - orderedcenter[i].Z);
-                            
+                                orderedcenter[i+1].Y - orderedcenter[i].Y,
+                                orderedcenter[i + 1].Z - orderedcenter[i].Z);
                         }
 
                     }
