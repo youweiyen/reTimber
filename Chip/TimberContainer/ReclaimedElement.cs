@@ -1,14 +1,19 @@
-﻿using Grasshopper.Kernel.Types;
+﻿using Grasshopper.Kernel;
+using Grasshopper.Kernel.Types;
 using Rhino.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using GH_IO;
+using GH_IO.Serialization;
+using GH_IO.Types;
 
 namespace Chip.TimberContainer
 {
-    public class ReclaimedElement 
+    
+    public class ReclaimedElement
     {
         /// <summary>
         /// closed mesh of scanned timber

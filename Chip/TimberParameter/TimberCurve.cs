@@ -24,6 +24,7 @@ namespace Chip.TimberParameter
         {
         }
         //List<Curve> previewCurve = new List<Curve>();
+        List<ReclaimedElement> timberList = new List<ReclaimedElement>();
 
         /// <summary>
         /// Registers all the input parameters for this component.
@@ -34,6 +35,7 @@ namespace Chip.TimberParameter
             pManager.AddMeshParameter("SectionSides", "SectionSides", "SectionSides", GH_ParamAccess.list);
         }
 
+        
         /// <summary>
         /// Registers all the output parameters for this component.
         /// </summary>
@@ -43,6 +45,7 @@ namespace Chip.TimberParameter
             pManager.AddGeometryParameter("Section", "Section", "Section", GH_ParamAccess.list);
             //pManager.AddGeometryParameter("CenterCurve", "CenterCurve", "CenterCurve", GH_ParamAccess.list);
             pManager.AddGeometryParameter("CenterCurve", "CenterCurve", "CenterCurve", GH_ParamAccess.item);
+            pManager.AddGenericParameter("ReclaimedTimber", "RT", "Timber Curve Data", GH_ParamAccess.list);
         }
 
         /// <summary>
@@ -296,10 +299,14 @@ namespace Chip.TimberParameter
             //previewCurve.AddRange(contourCrv);
             timber.Centerline = centeraxis;
 
+            //Add timber to List
+            timberList.Add(timber);
+
             DA.SetDataList(0, polylines);
             DA.SetDataList(1, contourCrv);
             //DA.SetDataList(2, centerCrv);
             DA.SetData(2, centeraxis);
+            DA.SetDataList(3, timberList);
 
         }
         #region Preview

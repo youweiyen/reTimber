@@ -23,6 +23,8 @@ namespace Chip.TimberParameter
         {
         }
 
+        List<ReclaimedElement> timberList = new List<ReclaimedElement>();
+
         /// <summary>
         /// Registers all the input parameters for this component.
         /// </summary>
@@ -41,6 +43,7 @@ namespace Chip.TimberParameter
             pManager.AddMeshParameter("NonJoint", "SegMesh", "Non Joint Meshes", GH_ParamAccess.tree);
             pManager.AddBrepParameter("BoundingBrep", "Br", "Bounding Box Brep", GH_ParamAccess.item);
             pManager.AddMeshParameter("JointMesh", "JointMesh", "JointMesh", GH_ParamAccess.list);
+            pManager.AddGenericParameter("ReclaimedTimber", "RT", "Timber Joint Data", GH_ParamAccess.list);
         }
 
         /// <summary>
@@ -228,10 +231,14 @@ namespace Chip.TimberParameter
             List<Joint> timberJoints = new List<Joint> { timberjoint };
             timber.Joint = timberJoints;
 
+            //add to list
+            timberList.Add(timber);
+
             DA.SetDataTree(0, SeperatedShow);
             DA.SetData(1, boundingBrep);
             //DA.SetDataList(2, jointGroup);
             DA.SetDataList(2, JointMeshes);
+            DA.SetDataList(3, timberList);
         }
         public void GroupMeshesUsingRTree(List<Mesh> jointMesh, double searchDistance)
         {
