@@ -7,6 +7,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using Chip.UnitHelper;
 using Chip.TimberContainer;
+//using RecTimberClass;
 
 namespace Chip.TimberParameter
 {
@@ -55,6 +56,7 @@ namespace Chip.TimberParameter
         /// to store data in output parameters.</param>
         protected override void SolveInstance(IGH_DataAccess DA)
         {
+            timberList.Clear();
             ReclaimedElement timber = new ReclaimedElement();
             List<Mesh> ScannedMeshes = new List<Mesh>();
             List<Mesh> SectionSides = new List<Mesh>();

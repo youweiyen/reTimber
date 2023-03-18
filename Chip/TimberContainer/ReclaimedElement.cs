@@ -6,9 +6,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using GH_IO;
-using GH_IO.Serialization;
-using GH_IO.Types;
 
 namespace Chip.TimberContainer
 {
@@ -26,7 +23,7 @@ namespace Chip.TimberContainer
         /// <summary>
         /// timber joint
         /// </summary>
-        public List<Joint> Joint { get; set; }
+        public Joint Joint { get; set; }
         /// <summary>
         /// section lines of scanned timber
         /// </summary>

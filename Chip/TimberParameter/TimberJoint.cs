@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Chip.TimberContainer;
+//using RecTimberClass;
 using Grasshopper;
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Data;
@@ -52,6 +53,7 @@ namespace Chip.TimberParameter
         /// <param name="DA">The DA object is used to retrieve from inputs and store in outputs.</param>
         protected override void SolveInstance(IGH_DataAccess DA)
         {
+            timberList.Clear();
             ReclaimedElement timber = new ReclaimedElement();
             //List<Mesh> meshFaces = timber.SegmentedMesh;
             List<Mesh> meshFaces = new List<Mesh>();
@@ -157,87 +159,91 @@ namespace Chip.TimberParameter
                 j++;
             }
             #region jointGroup
-            ////make joint meshes into joint group
-            ////RTree rTree = new RTree();
-            //List<int> grouped = new List<int>();
-            ////Dictionary<int, Mesh> jointGroup = new Dictionary<int, Mesh>();
-            //List<Mesh> jointGroup = new List<Mesh>();
-            //double searchDistance = 0.06.FromMeter();
+            //make joint meshes into joint group
+            //RTree rTree = new RTree();
 
-            //for (int p = 0; p < JointMeshes.Count; p++)
-            //{
-            //    if (grouped.Contains(p))
-            //    {
-            //        continue;
-            //    }
-            //    Mesh groupMesh = new Mesh();
-            //    groupMesh.Append(JointMeshes[p]);
-            //    grouped.Add(p);
-            //    for (int k = 0; k < JointMeshes.Count; k++)
-            //    {
-            //        if (p == k)
-            //        {
-            //            continue;
-            //        }
-            //        if (grouped.Contains(k))
-            //        {
-            //            continue;
-            //        }
-            //        List<Point3d> verticesToCompare = new List<Point3d>();
-            //        for (int i = 0; i < JointMeshes[k].Vertices.Count; i++)
-            //        {
-            //            //rTree.Insert(JointMeshes[k].Vertices[i], i);
-            //            verticesToCompare.Add(JointMeshes[k].Vertices[i]);
-            //        }
-            //        List<Point3d> verticesToFind = new List<Point3d>();
-            //        for (int i = 0; i < JointMeshes[p].Vertices.Count; i++)
-            //        {
-            //            //Point3d vI = JointMeshes[p].Vertices[i];
-            //            //Sphere searchSphere = new Sphere(vI, searchDistance);
+            List<Mesh> jointGroup = new List<Mesh>();
 
-            //            //rTree.Search(searchSphere,
-            //            //    (sender, args) => { if (i < args.Id)
-            //            //        {
-            //            //            grouped.Add(k); 
-            //            //            groupMesh.Append(JointMeshes[k]);
+            if (JointMeshes[0].Vertices.Count < 100)
+            {
+                List<int> grouped = new List<int>();
 
-            //            //        } });
-            //            verticesToFind.Add(JointMeshes[p].Vertices[i]);
-            //        }
-            //        foreach (Point3d vertCompare in verticesToCompare)
-            //        {
-            //            foreach(Point3d vertFind in verticesToFind)
-            //            {
-            //                if (vertCompare.DistanceTo(vertFind) < searchDistance)
-            //                {
-            //                    grouped.Add(k);
-            //                    groupMesh.Append(JointMeshes[k]);
-            //                    continue;
-            //                }
+                double searchDistance = 0.06.FromMeter();
 
-            //            }
-            //        }
-            //    }
-            //    //jointGroup.Add(p, groupMesh);
-            //    jointGroup.Add(groupMesh);
-            //}
+                for (int p = 0; p < JointMeshes.Count; p++)
+                {
+                    if (grouped.Contains(p))
+                    {
+                        continue;
+                    }
+                    Mesh groupMesh = new Mesh();
+                    groupMesh.Append(JointMeshes[p]);
+                    grouped.Add(p);
+                    for (int k = 0; k < JointMeshes.Count; k++)
+                    {
+                        if (p == k)
+                        {
+                            continue;
+                        }
+                        if (grouped.Contains(k))
+                        {
+                            continue;
+                        }
+                        List<Point3d> verticesToCompare = new List<Point3d>();
+                        for (int i = 0; i < JointMeshes[k].Vertices.Count; i++)
+                        {
+                            //rTree.Insert(JointMeshes[k].Vertices[i], i);
+                            verticesToCompare.Add(JointMeshes[k].Vertices[i]);
+                        }
+                        List<Point3d> verticesToFind = new List<Point3d>();
+                        for (int i = 0; i < JointMeshes[p].Vertices.Count; i++)
+                        {
+                            //Point3d vI = JointMeshes[p].Vertices[i];
+                            //Sphere searchSphere = new Sphere(vI, searchDistance);
+
+                            //rTree.Search(searchSphere,
+                            //    (sender, args) => { if (i < args.Id)
+                            //        {
+                            //            grouped.Add(k); 
+                            //            groupMesh.Append(JointMeshes[k]);
+
+                            //        } });
+                            verticesToFind.Add(JointMeshes[p].Vertices[i]);
+                        }
+                        foreach (Point3d vertCompare in verticesToCompare)
+                        {
+                            foreach (Point3d vertFind in verticesToFind)
+                            {
+                                if (vertCompare.DistanceTo(vertFind) < searchDistance)
+                                {
+                                    grouped.Add(k);
+                                    groupMesh.Append(JointMeshes[k]);
+                                    continue;
+                                }
+
+                            }
+                        }
+                    }
+                    //jointGroup.Add(p, groupMesh);
+                    jointGroup.Add(groupMesh);
+                }
+            }
             #endregion
             //Dictionary<int, Mesh>.ValueCollection meshGroup = jointGroup.Values;
             //make boundingbox around joint, for the scanned joints are scattered, and joints sizes can be measured
 
+            timberjoint.Face = jointGroup;
+            timber.Joint = timberjoint;
             //add to timber container
-            //timberjoint.Face = jointGroup;
-            //timberjoint.Depth = depthList;
-            List<Joint> timberJoints = new List<Joint> { timberjoint };
-            timber.Joint = timberJoints;
+
 
             //add to list
             timberList.Add(timber);
 
             DA.SetDataTree(0, SeperatedShow);
             DA.SetData(1, boundingBrep);
-            //DA.SetDataList(2, jointGroup);
-            DA.SetDataList(2, JointMeshes);
+            DA.SetDataList(2, jointGroup);
+            //DA.SetDataList(2, JointMeshes);
             DA.SetDataList(3, timberList);
         }
         public void GroupMeshesUsingRTree(List<Mesh> jointMesh, double searchDistance)

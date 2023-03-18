@@ -5,6 +5,8 @@ using Chip.TimberContainer;
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
 using Rhino.Geometry;
+using Rhino.Input.Custom;
+//using RecTimberClass;
 
 namespace Chip.TimberImport
 {
@@ -52,21 +54,24 @@ namespace Chip.TimberImport
             DA.GetDataList(1, joint_asGoo);
 
             List<ReclaimedElement> timberCurve = new List<ReclaimedElement>();
+            List<ReclaimedElement> jointCurve = new List<ReclaimedElement>();
 
-            foreach (IGH_Goo curvegoo in curve_asGoo)
+            foreach (IGH_Goo curveGoo in curve_asGoo)
             {
-                List<IGH_Goo> gooObject = new List<IGH_Goo> { curvegoo };
-
-                timberCurve = gooObject.Cast<ReclaimedElement>().ToList();
+                ReclaimedElement curvesingle = new ReclaimedElement();
+                curveGoo.CastTo(out curvesingle);
+                timberCurve.Add(curvesingle);
             }
 
-            List<ReclaimedElement> timberCurve = new List<ReclaimedElement>();
-            List<ReclaimedElement> jointCurve = new List<ReclaimedElement>();
-            timberCurve = curve_asGoo.Cast<ReclaimedElement>().ToList();
-            jointCurve = joint_asGoo.Cast<ReclaimedElement>().ToList();
+            foreach (IGH_Goo jointGoo in joint_asGoo)
+            {
+                ReclaimedElement jointsingle = new ReclaimedElement();
+                jointGoo.CastTo(out jointsingle);
+                jointCurve.Add(jointsingle);
+            }
 
 
-            for(int i  = 0; i < timberCurve.Count; i++)
+            for (int i  = 0; i < timberCurve.Count; i++)
             {
                 timberCurve[i].SegmentedMesh = jointCurve[i].SegmentedMesh;
                 timberCurve[i].Joint = jointCurve[i].Joint;
