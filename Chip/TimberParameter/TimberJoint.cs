@@ -11,6 +11,7 @@ using Rhino.Geometry;
 using Rhino.Geometry.Collections;
 using Chip.UnitHelper;
 using System.IO.IsolatedStorage;
+using System.Net.Configuration;
 
 namespace Chip.TimberParameter
 {
@@ -60,7 +61,6 @@ namespace Chip.TimberParameter
             Curve centerAxis = null;
             DA.GetDataList(0, meshFaces);
             DA.GetData(1, ref centerAxis);
-
 
             //Get aligned object bounding box
             Point3d startpoint = centerAxis.PointAtStart;
@@ -230,13 +230,87 @@ namespace Chip.TimberParameter
             }
             #endregion
             //Dictionary<int, Mesh>.ValueCollection meshGroup = jointGroup.Values;
+
             //make boundingbox around joint, for the scanned joints are scattered, and joints sizes can be measured
+            //Get aligned object bounding box, same orientation and method as finding bounding box brep for timber element
 
-            timberjoint.Face = jointGroup;
-            timber.Joint = timberjoint;
+            List<Brep>jointBreps= new List<Brep>();
+            foreach (Mesh joint in jointGroup) 
+            {
+                BoundingBox jointBound = joint.GetBoundingBox(boxPlane);
+
+                //boundingBox to Brep
+                Brep jointBrep = Brep.CreateFromBox(jointBound);
+                jointBrep.Transform(orient);
+                jointBreps.Add(jointBrep);
+            }
+
+            //JointSize, Depth, UV
+            List<double>depthlist= new List<double>();
+            List<double>ulengthlist= new List<double>();
+            List<double>vlengthlist= new List<double>();
+            
+            foreach (Brep jBox in jointBreps)
+            {
+                //find furthest Brep, find Brep distance to Curve(depth), Brep UV length
+                //joint position on curve
+                List<double> faceDepth = new List<double>();
+                List<BrepFace> faceBrep = new List<BrepFace>();
+                
+                foreach(BrepFace brepFace in jBox.Faces)
+                {
+                    double t;
+                    Point3d faceCenter = AreaMassProperties.Compute(brepFace.ToBrep()).Centroid;
+                    centerAxis.ClosestPoint(faceCenter, out t);
+                    double distancedepth = faceCenter.DistanceTo(centerAxis.PointAt(t));
+                    faceBrep.Add(brepFace);
+                    faceDepth.Add(distancedepth);
+                }
+
+                var brepAnddepth = faceDepth.Select((d, i) => new { Depth = d, Face = i }).OrderByDescending(x=>x.Depth);
+                var firstBrepDepth = brepAnddepth.First();
+                var lastBrepDepth = brepAnddepth.Last();
+                double depth = firstBrepDepth.Depth - lastBrepDepth.Depth;
+                Brep furthestBrepFace = faceBrep[firstBrepDepth.Face].ToBrep();
+                //Brep furthestBrepFace = jBox.Faces.OrderByDescending(brepFace => AreaMassProperties.Compute(brepFace.ToBrep()).Centroid.DistanceTo
+                //    (centerAxis.ClosestPoint(AreaMassProperties.Compute(brepFace.ToBrep()).Centroid))).First().ToBrep();
+
+                //double depth = AreaMassProperties.Compute(furthestBrepFace).Centroid.DistanceTo
+                //    (centerPoly.ClosestPoint
+                //    (AreaMassProperties.Compute(furthestBrepFace).Centroid));
+
+                List<double> ulength = new List<double>();
+                List<double> vlength = new List<double>();
+
+                for (int i = 0; i < furthestBrepFace.Edges.Count; i++)
+                {
+                    Vector3d edgeVector = furthestBrepFace.Edges[i].PointAtEnd - furthestBrepFace.Edges[i].PointAtStart;
+                    //centerVector is boundingbox orientation vector
+                    double edgeAngle = Vector3d.VectorAngle(edgeVector, centerVector);
+
+                    if (80 < edgeAngle.ToDegrees() && edgeAngle.ToDegrees() < 100)
+                    {
+                        vlength.Add(furthestBrepFace.Edges[i].GetLength());
+                    }
+                    else
+                    {
+                        ulength.Add(furthestBrepFace.Edges[i].GetLength());
+                    }
+
+                }
+                depthlist.Add(depth);
+                ulengthlist.Add(ulength[0]);
+                vlengthlist.Add(vlength[0]);
+            }
+
             //add to timber container
-
-
+            timberjoint.Face = jointGroup;
+            timberjoint.BoundingBrep= jointBreps;
+            timberjoint.Depth = depthlist;
+            timberjoint.uLength = ulengthlist;
+            timberjoint.vLength = vlengthlist;
+            timber.Joint = timberjoint;
+            
             //add to list
             timberList.Add(timber);
 
@@ -245,6 +319,7 @@ namespace Chip.TimberParameter
             DA.SetDataList(2, jointGroup);
             //DA.SetDataList(2, JointMeshes);
             DA.SetDataList(3, timberList);
+            //DA.SetDataList(4, jointBreps);
         }
         public void GroupMeshesUsingRTree(List<Mesh> jointMesh, double searchDistance)
         {
