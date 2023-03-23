@@ -47,6 +47,7 @@ namespace Chip.TimberParameter
             //pManager.AddGeometryParameter("CenterCurve", "CenterCurve", "CenterCurve", GH_ParamAccess.list);
             pManager.AddGeometryParameter("CenterCurve", "CenterCurve", "CenterCurve", GH_ParamAccess.item);
             pManager.AddGenericParameter("ReclaimedTimber", "RT", "Timber Curve Data", GH_ParamAccess.list);
+            pManager.AddGeometryParameter("testbox", "tb", "testbox", GH_ParamAccess.item);
         }
 
         /// <summary>
@@ -298,8 +299,52 @@ namespace Chip.TimberParameter
             {
                 centeraxis.Add(aP);
             }
+
+            //Timber Dimension
+            //Get aligned object bounding box
+            Vector3d centerVector = contourEndPoints[1] - contourEndPoints[0];
+            Plane boxPlane = new Plane(contourEndPoints[0], centerVector);
+            //plane aligned to origin. transform brep to aligned object
+            Plane originplane = new Plane(new Point3d(0, 0, 0), new Vector3d(0, 0, 1));
+            BoundingBox boundingBox = JoinMesh.GetBoundingBox(boxPlane);
+            Transform orient = Transform.PlaneToPlane(originplane, boxPlane);
+            //boundingBox to Brep
+            Brep boundingBrep = Brep.CreateFromBox(boundingBox);
+            boundingBrep.Transform(orient);
+            
+            List<double> allEdgeLength = new List<double>();
+            foreach(BrepEdge edge in boundingBrep.Edges)
+            {
+                allEdgeLength.Add(edge.GetLength());
+            }
+
+            List<double>singleLength = allEdgeLength.Distinct().OrderBy(edgeLength => edgeLength).ToList();
+
+            List<double> ulength= new List<double>();
+            List<double> vlength= new List<double>();
+            List<double> wlength= new List<double>();
+            if(singleLength.Count == 2)
+            {
+                ulength.Add(singleLength[1]);
+                vlength.Add(singleLength[0]);
+                wlength.Add(singleLength[0]);
+            }
+            else
+            {
+                vlength.Add(singleLength[0]);
+                wlength.Add(singleLength[1]);
+                ulength.Add(singleLength[2]);
+            }
+            //timber plane
+
+
+            //Add to timber
+            timber.Boundary = boundingBrep;
             //previewCurve.AddRange(contourCrv);
             timber.Centerline = centeraxis;
+            timber.uLength = ulength;
+            timber.vLength = vlength;
+            timber.wLength = wlength;
 
             //Add timber to List
             timberList.Add(timber);
@@ -309,6 +354,7 @@ namespace Chip.TimberParameter
             //DA.SetDataList(2, centerCrv);
             DA.SetData(2, centeraxis);
             DA.SetDataList(3, timberList);
+            DA.SetData(4, boundingBrep);
 
         }
         #region Preview

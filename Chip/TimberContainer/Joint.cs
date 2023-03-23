@@ -12,7 +12,7 @@ namespace Chip.TimberContainer
         /// <summary>
         /// Joint Center and position on Curve
         /// </summary>
-        public Plane Plane { get; set; }
+        public List<Plane> Plane { get; set; }
         /// <summary>
         /// joint type
         /// </summary>

@@ -77,7 +77,7 @@ namespace Chip.TimberParameter
             Brep boundingBrep = Brep.CreateFromBox(boundingBox);
             boundingBrep.Transform(orient);
             //Add to timber
-            timber.Boundary = boundingBrep;
+            //timber.Boundary = boundingBrep;
             timber.SegmentedMesh = meshFaces;
 
 
@@ -161,6 +161,7 @@ namespace Chip.TimberParameter
             #region jointGroup
             //make joint meshes into joint group
             //RTree rTree = new RTree();
+            //TO DO : Make RTree
 
             List<Mesh> jointGroup = new List<Mesh>();
 
@@ -249,6 +250,7 @@ namespace Chip.TimberParameter
             List<double>depthlist= new List<double>();
             List<double>ulengthlist= new List<double>();
             List<double>vlengthlist= new List<double>();
+            List<Plane> planeList = new List<Plane>();
             
             foreach (Brep jBox in jointBreps)
             {
@@ -259,9 +261,8 @@ namespace Chip.TimberParameter
                 
                 foreach(BrepFace brepFace in jBox.Faces)
                 {
-                    double t;
                     Point3d faceCenter = AreaMassProperties.Compute(brepFace.ToBrep()).Centroid;
-                    centerAxis.ClosestPoint(faceCenter, out t);
+                    centerAxis.ClosestPoint(faceCenter, out double t);
                     double distancedepth = faceCenter.DistanceTo(centerAxis.PointAt(t));
                     faceBrep.Add(brepFace);
                     faceDepth.Add(distancedepth);
@@ -270,31 +271,32 @@ namespace Chip.TimberParameter
                 var brepAnddepth = faceDepth.Select((d, i) => new { Depth = d, Face = i }).OrderByDescending(x=>x.Depth);
                 var firstBrepDepth = brepAnddepth.First();
                 var lastBrepDepth = brepAnddepth.Last();
+                //Joint Depth
                 double depth = firstBrepDepth.Depth - lastBrepDepth.Depth;
-                Brep furthestBrepFace = faceBrep[firstBrepDepth.Face].ToBrep();
-                //Brep furthestBrepFace = jBox.Faces.OrderByDescending(brepFace => AreaMassProperties.Compute(brepFace.ToBrep()).Centroid.DistanceTo
-                //    (centerAxis.ClosestPoint(AreaMassProperties.Compute(brepFace.ToBrep()).Centroid))).First().ToBrep();
+                //Joint Position Plane
+                BrepFace furthestBrepFace = faceBrep[firstBrepDepth.Face];
+                centerAxis.ClosestPoint(furthestBrepFace.PointAt(0.5, 0.5), out double pointOnCurveParam);
+                Plane jointPlane = new Plane(centerAxis.PointAt(pointOnCurveParam), furthestBrepFace.NormalAt(0.5, 0.5));
+                planeList.Add(jointPlane);
 
-                //double depth = AreaMassProperties.Compute(furthestBrepFace).Centroid.DistanceTo
-                //    (centerPoly.ClosestPoint
-                //    (AreaMassProperties.Compute(furthestBrepFace).Centroid));
-
+                //Joint UV Length
                 List<double> ulength = new List<double>();
                 List<double> vlength = new List<double>();
+                Brep furthestBrep = furthestBrepFace.ToBrep();
 
-                for (int i = 0; i < furthestBrepFace.Edges.Count; i++)
+                for (int i = 0; i < furthestBrep.Edges.Count; i++)
                 {
-                    Vector3d edgeVector = furthestBrepFace.Edges[i].PointAtEnd - furthestBrepFace.Edges[i].PointAtStart;
+                    Vector3d edgeVector = furthestBrep.Edges[i].PointAtEnd - furthestBrep.Edges[i].PointAtStart;
                     //centerVector is boundingbox orientation vector
                     double edgeAngle = Vector3d.VectorAngle(edgeVector, centerVector);
 
                     if (80 < edgeAngle.ToDegrees() && edgeAngle.ToDegrees() < 100)
                     {
-                        vlength.Add(furthestBrepFace.Edges[i].GetLength());
+                        vlength.Add(furthestBrep.Edges[i].GetLength());
                     }
                     else
                     {
-                        ulength.Add(furthestBrepFace.Edges[i].GetLength());
+                        ulength.Add(furthestBrep.Edges[i].GetLength());
                     }
 
                 }
@@ -309,6 +311,7 @@ namespace Chip.TimberParameter
             timberjoint.Depth = depthlist;
             timberjoint.uLength = ulengthlist;
             timberjoint.vLength = vlengthlist;
+            timberjoint.Plane = planeList;
             timber.Joint = timberjoint;
             
             //add to list

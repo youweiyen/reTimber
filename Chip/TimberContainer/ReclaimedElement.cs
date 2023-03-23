@@ -25,9 +25,17 @@ namespace Chip.TimberContainer
         /// </summary>
         public Joint Joint { get; set; }
         /// <summary>
-        /// section lines of scanned timber
+        /// u length of timber, parallel to timber center curve
         /// </summary>
-        public List<Polyline> Sections { get; set; }
+        public List<double> uLength { get; set; }
+        /// <summary>
+        /// vLength of Timber, first length perpendicular to timber center curve
+        /// </summary>
+        public List<double> vLength { get; set; }
+        /// <summary>
+        /// vLength of Timber, second length perpendicular to timber center curve
+        /// </summary>
+        public List<double> wLength { get; set; }
         /// <summary>
         /// pure centerline of timber
         /// </summary>
@@ -37,11 +45,7 @@ namespace Chip.TimberContainer
         /// </summary>
         public Brep Boundary { get; set; }
         /// <summary>
-        /// normal of every timber surface
-        /// </summary>
-        public List<Vector3d> Normal { get; set; }
-        /// <summary>
-        /// Plane origin of Reclaimed Timber
+        /// Plane origin of Reclaimed Timber, to compare rotated position
         /// </summary>
         public Plane Plane { get; set; }
 

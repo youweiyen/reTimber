@@ -61,32 +61,18 @@ namespace Chip.TimberParameter
             List<Brep> modelElement = new List<Brep>();
             DA.GetDataList(1, modelElement);
 
-            
-            foreach(Brep mElement in modelElement)
+            //double depthThreshold;
+
+            //if timber v/w length is enough, rotate both ways
+            //if joint is under threshold, then save joint as possible joint cutting part
+            //if over threshold, cut off joint part, and calculate each remaining pieces u length, and save the usable joint position on curve
+            //move closed mesh from reused joint part as edge
+
+            foreach (Brep mElement in modelElement)
             {
                 foreach (ReclaimedElement element in reclaimedTimber)
                 {
-                    //find furthest Brep, find Brep distance to Curve(depth), Brep UV length
 
-                    //element.Joint.BoundingBrep.OrderByDescending(br => AreaMassProperties.Compute(br).Centroid.DistanceTo(element.Centerline.ClosestPoint())
-                    //joint position on curve
-                    foreach(Brep bBrep in element.Joint.BoundingBrep)
-                    {
-                        Brep furthestBrepFace = bBrep.Faces.OrderByDescending(brepFace => AreaMassProperties.Compute(brepFace.ToBrep()).Centroid.DistanceTo
-                            (element.Centerline.ClosestPoint
-                            (AreaMassProperties.Compute(brepFace.ToBrep()).Centroid))).First().ToBrep();
-
-                        double depth = AreaMassProperties.Compute(furthestBrepFace).Centroid.DistanceTo
-                            (element.Centerline.ClosestPoint
-                            (AreaMassProperties.Compute(furthestBrepFace).Centroid));
-                        for(int i = 0; i<bBrep.Edges.Count; i++)
-                        {
-                            Vector3d edgeVector = bBrep.Edges[i].PointAtEnd - bBrep.Edges[i].PointAtStart; 
-                            //if(edgeVector)
-                            //bBrep.Edges[i].GetLength;
-                        }
-                        
-                    }
                 }
             }
 
