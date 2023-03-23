@@ -320,23 +320,22 @@ namespace Chip.TimberParameter
 
             List<double>singleLength = allEdgeLength.Distinct().OrderBy(edgeLength => edgeLength).ToList();
 
-            List<double> ulength= new List<double>();
-            List<double> vlength= new List<double>();
-            List<double> wlength= new List<double>();
-            if(singleLength.Count == 2)
+            double ulength, vlength, wlength;
+
+            if (singleLength.Count == 2)
             {
-                ulength.Add(singleLength[1]);
-                vlength.Add(singleLength[0]);
-                wlength.Add(singleLength[0]);
+                ulength = singleLength[1];
+                vlength = singleLength[0];
+                wlength = singleLength[0];
             }
             else
             {
-                vlength.Add(singleLength[0]);
-                wlength.Add(singleLength[1]);
-                ulength.Add(singleLength[2]);
+                vlength = singleLength[0];
+                wlength = singleLength[1];
+                ulength = singleLength[2];
             }
             //timber plane
-
+            Plane timberPlane = new Plane(centeraxis.ToPolylineCurve().PointAtStart, centerVector);
 
             //Add to timber
             timber.Boundary = boundingBrep;
@@ -345,6 +344,7 @@ namespace Chip.TimberParameter
             timber.uLength = ulength;
             timber.vLength = vlength;
             timber.wLength = wlength;
+            timber.Plane= timberPlane;
 
             //Add timber to List
             timberList.Add(timber);

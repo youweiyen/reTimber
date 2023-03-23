@@ -27,15 +27,15 @@ namespace Chip.TimberContainer
         /// <summary>
         /// u length of timber, parallel to timber center curve
         /// </summary>
-        public List<double> uLength { get; set; }
+        public double uLength { get; set; }
         /// <summary>
         /// vLength of Timber, first length perpendicular to timber center curve
         /// </summary>
-        public List<double> vLength { get; set; }
+        public double vLength { get; set; }
         /// <summary>
         /// vLength of Timber, second length perpendicular to timber center curve
         /// </summary>
-        public List<double> wLength { get; set; }
+        public double wLength { get; set; }
         /// <summary>
         /// pure centerline of timber
         /// </summary>
