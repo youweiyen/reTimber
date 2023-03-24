@@ -268,35 +268,47 @@ namespace Chip.TimberParameter
                     faceDepth.Add(distancedepth);
                 }
 
-                var brepAnddepth = faceDepth.Select((d, i) => new { Depth = d, Face = i }).OrderByDescending(x=>x.Depth);
-                var firstBrepDepth = brepAnddepth.First();
-                var lastBrepDepth = brepAnddepth.Last();
+                var brepAnddepth = faceDepth.Select((d, i) => new { Depth = d, Face = i }).OrderBy(x=>x.Depth);
+                var closestBrepDepth = brepAnddepth.First();
                 //Joint Depth
-                double depth = firstBrepDepth.Depth - lastBrepDepth.Depth;
+                double depth = 0;
+                for (int cl = 0; cl<faceBrep.Count; cl++)
+                {
+                    Vector3d eachNormal = faceBrep[cl].NormalAt(0.5, 0.5);
+                    Vector3d closestNormal = faceBrep[closestBrepDepth.Face].NormalAt(0.5, 0.5);
+                    double oppositeAngle = Vector3d.VectorAngle(eachNormal, closestNormal);
+                    if (oppositeAngle.ToDegrees() < 190 && oppositeAngle.ToDegrees() > 170)
+                    {
+                        double dist = AreaMassProperties.Compute(faceBrep[cl].ToBrep()).Centroid
+                            .DistanceTo(AreaMassProperties.Compute(faceBrep[closestBrepDepth.Face].ToBrep()).Centroid);
+                        depth = dist;
+                    }
+                }
+                
                 //Joint Position Plane
-                BrepFace furthestBrepFace = faceBrep[firstBrepDepth.Face];
-                centerAxis.ClosestPoint(furthestBrepFace.PointAt(0.5, 0.5), out double pointOnCurveParam);
-                Plane jointPlane = new Plane(centerAxis.PointAt(pointOnCurveParam), furthestBrepFace.NormalAt(0.5, 0.5));
+                BrepFace closestBrepFace = faceBrep[closestBrepDepth.Face];
+                centerAxis.ClosestPoint(closestBrepFace.PointAt(0.5, 0.5), out double pointOnCurveParam);
+                Plane jointPlane = new Plane(centerAxis.PointAt(pointOnCurveParam), closestBrepFace.NormalAt(0.5, 0.5));
                 planeList.Add(jointPlane);
 
                 //Joint UV Length
                 List<double> ulength = new List<double>();
                 List<double> vlength = new List<double>();
-                Brep furthestBrep = furthestBrepFace.ToBrep();
+                Brep closestBrep = closestBrepFace.ToBrep();
 
-                for (int i = 0; i < furthestBrep.Edges.Count; i++)
+                for (int i = 0; i < closestBrep.Edges.Count; i++)
                 {
-                    Vector3d edgeVector = furthestBrep.Edges[i].PointAtEnd - furthestBrep.Edges[i].PointAtStart;
+                    Vector3d edgeVector = closestBrep.Edges[i].PointAtEnd - closestBrep.Edges[i].PointAtStart;
                     //centerVector is boundingbox orientation vector
                     double edgeAngle = Vector3d.VectorAngle(edgeVector, centerVector);
 
                     if (80 < edgeAngle.ToDegrees() && edgeAngle.ToDegrees() < 100)
                     {
-                        vlength.Add(furthestBrep.Edges[i].GetLength());
+                        vlength.Add(closestBrep.Edges[i].GetLength());
                     }
                     else
                     {
-                        ulength.Add(furthestBrep.Edges[i].GetLength());
+                        ulength.Add(closestBrep.Edges[i].GetLength());
                     }
 
                 }

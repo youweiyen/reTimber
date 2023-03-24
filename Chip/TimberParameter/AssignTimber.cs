@@ -185,9 +185,24 @@ namespace Chip.TimberParameter
                         || element.wLength > minV && element.wLength < maxV && element.vLength > minW && element.vLength < maxW)
                     {
                         //if joint fits in any of the model joints
-                        for (int i = 0; i < element.Joint.Depth.Count; i++)
+                        for (int p = 0; p < element.Joint.Plane.Count; p++)
                         {
+                            List<double> modeljointnum = new List<double>();
+                            List<double> reclaimJointnum = new List<double>();
+                            //compare to each joint in model element
+                            for (int uL = 0; uL< ulengthlist.Count; uL++)
+                            {
+                                if (element.Joint.uLength[p] < ulengthlist[uL] 
+                                    && element.Joint.vLength[p] < vlengthlist[uL] 
+                                    && element.Joint.Depth[p] < depthlist[uL])
+                                {
+                                    if(reclaimJointnum.Any(item => item == p) == false)
+                                    {
 
+                                    }
+                                }
+                            }
+                            
                         }
                         //if joint depth is under threshold, not then cut away piece
                         for (int i = 0; i < element.Joint.Depth.Count; i++)
