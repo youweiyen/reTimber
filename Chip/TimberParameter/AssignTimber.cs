@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using Chip.TimberContainer;
 using Chip.UnitHelper;
 using Grasshopper.Kernel;
@@ -40,6 +41,8 @@ namespace Chip.TimberParameter
         {
             pManager.AddMeshParameter("FitPiece", "FP", "Pieces that are  applicable", GH_ParamAccess.list);
             pManager.AddNumberParameter("WasteSum", "WS", "Cut off length", GH_ParamAccess.list);
+            pManager.AddCurveParameter("C", "c", "c", GH_ParamAccess.list);
+            pManager.AddPointParameter("cP", "cP", "cP", GH_ParamAccess.list);
         }
 
         /// <summary>
@@ -66,7 +69,7 @@ namespace Chip.TimberParameter
             DA.GetDataList(2, jointModel);
 
             //Brep Center Curve
-            List<Polyline> centerPoly = new List<Polyline>();
+            List<Curve> centerCurve = new List<Curve>();
             List<Vector3d> centerVector = new List<Vector3d>();
             foreach(Brep br in modelElement)
             {
@@ -82,8 +85,9 @@ namespace Chip.TimberParameter
                     AreaMassProperties.Compute(orderFace[0]).Centroid,
                     AreaMassProperties.Compute(orderFace[1]).Centroid
                 };
+                brepPoly.ToPolylineCurve();
                 centerVector.Add(brepVector);
-                centerPoly.Add(brepPoly);
+                centerCurve.Add(brepPoly.ToPolylineCurve());
             }
 
             double depthThreshold = 0.05.FromMeter();
@@ -92,7 +96,7 @@ namespace Chip.TimberParameter
             //if joint is under threshold, then save joint as possible joint cutting part
             //if over threshold, cut off joint part, and calculate each remaining pieces u length, and save the usable joint position on curve
             //move closed mesh from reused joint part as edge
-
+            List<Point3d> centertest = new List<Point3d>();
             //model element dimensions, and its joint dimensions
             for (int b  = 0; b < modelElement.Count;b++)
             {
@@ -128,28 +132,53 @@ namespace Chip.TimberParameter
                     List<double> faceDepth = new List<double>();
                     List<BrepFace> faceBrep = new List<BrepFace>();
 
-                    foreach (BrepFace brepFace in jm.Faces)
+                    //Make boundingbox for imported unstandard objects
+                    Plane boxPlane = new Plane(centerCurve[b].PointAtStart, centerVector[b]);
+                    BoundingBox jointBound = jm.GetBoundingBox(boxPlane);
+                    //boundingBox to Brep
+                    Brep jointBrep = Brep.CreateFromBox(jointBound);
+                    Plane originplane = new Plane(new Point3d(0, 0, 0), new Vector3d(0, 0, 1));
+                    Transform orient = Transform.PlaneToPlane(originplane, boxPlane);
+                    jointBrep.Transform(orient);
+
+                    foreach (BrepFace brepFace in jointBrep.Faces)
                     {
                         Point3d faceCenter = AreaMassProperties.Compute(brepFace.ToBrep()).Centroid;
-                        double distancedepth = faceCenter.DistanceTo(centerPoly[b].ClosestPoint(faceCenter));
+                        centerCurve[b].ClosestPoint(faceCenter, out double t);
+                        double distancedepth = faceCenter.DistanceTo(centerCurve[b].PointAt(t));
                         faceBrep.Add(brepFace);
                         faceDepth.Add(distancedepth);
+                        centertest.Add(faceCenter);
                     }
 
-                    var brepAnddepth = faceDepth.Select((d, j) => new { Depth = d, Face = j }).OrderByDescending(x => x.Depth);
-                    var firstBrepDepth = brepAnddepth.First();
-                    var lastBrepDepth = brepAnddepth.Last();
+                    var brepAnddepth = faceDepth.Select((d, j) => new { Depth = d, Face = j }).OrderBy(x => x.Depth);
+                    var closestBrepDepth = brepAnddepth.First();
+
                     //Joint Depth
-                    double depth = firstBrepDepth.Depth - lastBrepDepth.Depth;
+                    double depth = 0;
+                    for (int cl = 0; cl < faceBrep.Count; cl++)
+                    {
+                        Vector3d eachNormal = faceBrep[cl].NormalAt(0.5, 0.5);
+                        Vector3d closestNormal = faceBrep[closestBrepDepth.Face].NormalAt(0.5, 0.5);
+                        double oppositeAngle = Vector3d.VectorAngle(eachNormal, closestNormal);
+                        if (oppositeAngle.ToDegrees() < 190 && oppositeAngle.ToDegrees() > 170)
+                        {
+                            double dist = AreaMassProperties.Compute(faceBrep[cl].ToBrep()).Centroid
+                                .DistanceTo(AreaMassProperties.Compute(faceBrep[closestBrepDepth.Face].ToBrep()).Centroid);
+                            depth = dist;
+                        }
+                    }
+
                     //Joint Position Plane
-                    BrepFace furthestBrepFace = faceBrep[firstBrepDepth.Face];
-                    Plane jointPlane = new Plane(centerPoly[b].ClosestPoint(furthestBrepFace.PointAt(0.5, 0.5)), furthestBrepFace.NormalAt(0.5, 0.5));
+                    BrepFace closestBrepFace = faceBrep[closestBrepDepth.Face];
+                    centerCurve[b].ClosestPoint(closestBrepFace.PointAt(0.5, 0.5), out double pointOnCurveParam);
+                    Plane jointPlane = new Plane(centerCurve[b].PointAt(pointOnCurveParam), closestBrepFace.NormalAt(0.5, 0.5));
                     planeList.Add(jointPlane);
 
                     //Joint UV Length
                     List<double> ulength = new List<double>();
                     List<double> vlength = new List<double>();
-                    Brep furthestBrep = furthestBrepFace.ToBrep();
+                    Brep furthestBrep = closestBrepFace.ToBrep();
 
                     for (int f = 0; f < furthestBrep.Edges.Count; f++)
                     {
@@ -216,8 +245,8 @@ namespace Chip.TimberParameter
                     }
                 }
             }
-
-
+            DA.SetDataList(2, centerCurve);
+            DA.SetDataList(3, centertest);
         }
 
         /// <summary>
