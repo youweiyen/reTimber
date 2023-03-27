@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -6,6 +7,8 @@ using Chip.TimberContainer;
 using Chip.UnitHelper;
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
+using Grasshopper.Kernel.Types.Transforms;
+using Rhino.DocObjects;
 using Rhino.Geometry;
 
 namespace Chip.TimberParameter
@@ -213,35 +216,98 @@ namespace Chip.TimberParameter
                     if(element.vLength > minV && element.vLength < maxV && element.wLength > minW && element.wLength < maxW 
                         || element.wLength > minV && element.wLength < maxV && element.vLength > minW && element.vLength < maxW)
                     {
+                        Dictionary<int, List<int>> fitCondition = new Dictionary<int, List<int>>();
+                        Dictionary<int, List<int>> unfitCondition = new Dictionary<int, List<int>>();
                         //if joint fits in any of the model joints
-                        for (int p = 0; p < element.Joint.Plane.Count; p++)
+                        for (int uL = 0; uL < ulengthlist.Count; uL++)
                         {
-                            List<double> modeljointnum = new List<double>();
-                            List<double> reclaimJointnum = new List<double>();
+                            List<int> fitRecNum;
+                            List<int> unfitRecNum;
                             //compare to each joint in model element
-                            for (int uL = 0; uL< ulengthlist.Count; uL++)
+                            for (int p = 0; p < element.Joint.Plane.Count; p++)
                             {
+                                //if reclaimed joint size < to cut model joint size
                                 if (element.Joint.uLength[p] < ulengthlist[uL] 
                                     && element.Joint.vLength[p] < vlengthlist[uL] 
                                     && element.Joint.Depth[p] < depthlist[uL])
                                 {
-                                    if(reclaimJointnum.Any(item => item == p) == false)
+                                    if (!fitCondition.TryGetValue(uL, out fitRecNum))
                                     {
-
+                                        fitRecNum = new List<int>();
+                                        fitCondition.Add(uL, fitRecNum);
                                     }
+                                    fitRecNum.Add(p);
+                                    //if(reclaimJointnum.Any(item => item == p) == false)
+                                }
+                                //else then trim off
+                                else
+                                {
+                                    if (!unfitCondition.TryGetValue(uL, out unfitRecNum))
+                                    {
+                                        unfitRecNum = new List<int>();
+                                        unfitCondition.Add(uL, unfitRecNum);
+                                    }
+                                    unfitRecNum.Add(p);
                                 }
                             }
-                            
                         }
-                        //if joint depth is under threshold, not then cut away piece
+                        //arrange reclaimed timber position several conditions
+                        //use model joint distance to end,and apply the distance to reclaimed joint to see how much material we are cutting off
+                        //List<Plane> dupElJointPlane = new List<Plane>(element.Joint.Plane.Select(pl => pl.Clone()).ToList());
+                        for (int i = 0; i < fitCondition.Count; i++)
+                        {
+                            if (fitCondition[i] != null)
+                            {
+                                //distance of model joint to end of model center curve
+                                List<int> eleFitJoint = fitCondition[i];
+                                double ModJointToCurveStartDist = planeList[i].Origin.DistanceTo(centerCurve[b].PointAtStart);
+                                double ModJointToCurveEndDist = planeList[i].Origin.DistanceTo(centerCurve[b].PointAtEnd);
+                                Vector3d RecJointToCurveStartVect = element.Centerline.First - planeList[i].Origin;
+                                Vector3d RecJointToCurveEndVect = element.Centerline.Last - planeList[i].Origin;
+                                RecJointToCurveStartVect.Unitize();
+                                RecJointToCurveEndVect.Unitize();
+                                
+                                for (int jp = 0; jp < eleFitJoint.Count; jp++)
+                                {
+                                    Point3d RecJointOrigin = element.Joint.Plane[eleFitJoint[jp]].Origin;
+
+                                    //Condition 1
+                                    Transform moveStartCond1 = Transform.Translation(Vector3d.Multiply(RecJointToCurveStartVect, ModJointToCurveStartDist));
+                                    Transform moveEndCond1 = Transform.Translation(Vector3d.Multiply(RecJointToCurveStartVect, ModJointToCurveEndDist));
+                                    Point3d cond1StartRecJointOrigin = new Point3d(RecJointOrigin);
+                                    Point3d cond1EndRecJointOrigin = new Point3d(RecJointOrigin);
+                                    cond1StartRecJointOrigin.Transform(moveStartCond1);
+                                    cond1EndRecJointOrigin.Transform(moveEndCond1);
+
+                                    //Flip the beam, Condition 2
+                                    Transform moveStartCond2 = Transform.Translation(Vector3d.Multiply(RecJointToCurveStartVect, ModJointToCurveEndDist));
+                                    Transform moveEndCond2 = Transform.Translation(Vector3d.Multiply(RecJointToCurveStartVect, ModJointToCurveStartDist));
+                                    Point3d cond2StartRecJointOrigin = new Point3d(RecJointOrigin);
+                                    Point3d cond2EndRecJointOrigin = new Point3d(RecJointOrigin);
+                                    cond2StartRecJointOrigin.Transform(moveStartCond2);
+                                    cond2EndRecJointOrigin.Transform(moveEndCond2);
+
+                                    //if the length is enough then add joint combination group
+                                    //there are two sides of length to compare
+                                    //cut off the length that have: unfit joints and are over threshold, keep the length with joints that are under threshold
+                                    //if the other joints happen to be in the same position as their matching joints then dont cut: distanceModelJointToJoint = distanceRecJointToJoint
+                                    if()
+                                    cond1StartRecJointOrigin.DistanceTo(element.Centerline.ClosestPoint(cond1StartRecJointOrigin));
+                                }
+                                
+                            }
+
+                        }
+
+                        //reclaimed timber without joints or all the joints are under threshold, then compare beam u,v,w to see if comparable
+                        //last chance for joints: keep if joint depth is under threshold, not then cut away piece
                         for (int i = 0; i < element.Joint.Depth.Count; i++)
                         {
                             if (element.Joint.Depth[i] < depthThreshold)
                             {
-
+                               
                             }
                         }
-                        
                     }
                 }
             }
