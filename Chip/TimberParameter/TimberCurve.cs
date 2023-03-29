@@ -95,7 +95,7 @@ namespace Chip.TimberParameter
             }
 
             //contour crv
-            double contourDist = 0.02.FromMeter();
+            double contourDist = 0.019.FromMeter();
             IEnumerable<Curve> contourcurves = Mesh.CreateContourCurves(JoinMesh, sectionstart, contourEndPoints[1], contourDist, 0.01).ToList();
             List<Curve> contourCrv = Curve.JoinCurves(contourcurves, contourDist * 0.1, false).ToList();
 
