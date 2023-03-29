@@ -220,219 +220,228 @@ namespace Chip.TimberParameter
                         if (element.vLength > minV && element.vLength < maxV && element.wLength > minW && element.wLength < maxW
                             || element.wLength > minV && element.wLength < maxV && element.vLength > minW && element.vLength < maxW)
                         {
-                            Dictionary<int, List<int>> fitCondition = new Dictionary<int, List<int>>();
-                            Dictionary<int, List<int>> unfitCondition = new Dictionary<int, List<int>>();
-                            //if joint fits in any of the model joints
-                            for (int uL = 0; uL < ulengthlist.Count; uL++)
+                            //if Joint fits in any of the model joints => FOR PIECES WITH JOINTS
+                            if (element.Joint.Face.Count != 0) 
                             {
-                                List<int> fitRecNum;
-                                List<int> unfitRecNum;
-                                //compare to each joint in model element
-                                for (int p = 0; p < element.Joint.Plane.Count; p++)
+                                Dictionary<int, List<int>> fitCondition = new Dictionary<int, List<int>>();
+                                Dictionary<int, List<int>> unfitCondition = new Dictionary<int, List<int>>();
+                                for (int uL = 0; uL < ulengthlist.Count; uL++)
                                 {
-                                    //if reclaimed joint size < to cut model joint size
-                                    if (element.Joint.uLength[p] <= ulengthlist[uL]
-                                        && element.Joint.vLength[p] <= vlengthlist[uL]
-                                        && element.Joint.Depth[p] <= depthlist[uL])
+                                    List<int> fitRecNum;
+                                    List<int> unfitRecNum;
+                                    //compare to each joint in model element
+                                    for (int p = 0; p < element.Joint.Plane.Count; p++)
                                     {
-                                        if (!fitCondition.TryGetValue(uL, out fitRecNum))
+                                        //if reclaimed joint size < to cut model joint size
+                                        if (element.Joint.uLength[p] <= ulengthlist[uL]
+                                            && element.Joint.vLength[p] <= vlengthlist[uL]
+                                            && element.Joint.Depth[p] <= depthlist[uL])
                                         {
-                                            fitRecNum = new List<int>();
-                                            fitCondition.Add(uL, fitRecNum);
+                                            if (!fitCondition.TryGetValue(uL, out fitRecNum))
+                                            {
+                                                fitRecNum = new List<int>();
+                                                fitCondition.Add(uL, fitRecNum);
+                                            }
+                                            fitRecNum.Add(p);
+                                            //if(reclaimJointnum.Any(item => item == p) == false)
                                         }
-                                        fitRecNum.Add(p);
-                                        //if(reclaimJointnum.Any(item => item == p) == false)
+                                        //else then trim off
+                                        else
+                                        {
+                                            if (!unfitCondition.TryGetValue(uL, out unfitRecNum))
+                                            {
+                                                unfitRecNum = new List<int>();
+                                                unfitCondition.Add(uL, unfitRecNum);
+                                            }
+                                            unfitRecNum.Add(p);
+                                        }
                                     }
-                                    //else then trim off
-                                    else
+                                }
+                                //arrange reclaimed timber position several conditions
+                                //use model joint distance to end,and apply the distance to reclaimed joint to see how much material we are cutting off
+                                //List<Plane> dupElJointPlane = new List<Plane>(element.Joint.Plane.Select(pl => pl.Clone()).ToList());
+                                for (int i = 0; i < fitCondition.Count; i++)
+                                {
+                                    if (fitCondition[i] != null)
                                     {
-                                        if (!unfitCondition.TryGetValue(uL, out unfitRecNum))
+                                        //distance of model joint to end of model center curve
+                                        List<int> eleFitJoint = fitCondition[i];
+                                        double ModJointToCurveStartDist = planeList[i].Origin.DistanceTo(centerCurve[b].PointAtStart);
+                                        double ModJointToCurveEndDist = planeList[i].Origin.DistanceTo(centerCurve[b].PointAtEnd);
+                                        Vector3d RecJointToCurveStartVect = centerCurve[b].PointAtStart - planeList[i].Origin;
+                                        Vector3d RecJointToCurveEndVect = centerCurve[b].PointAtStart - planeList[i].Origin;
+                                        RecJointToCurveStartVect.Unitize();
+                                        RecJointToCurveEndVect.Unitize();
+
+                                        for (int fj = 0; fj < eleFitJoint.Count; fj++)
                                         {
-                                            unfitRecNum = new List<int>();
-                                            unfitCondition.Add(uL, unfitRecNum);
+                                            Point3d RecJointOrigin = element.Joint.Plane[eleFitJoint[fj]].Origin;
+
+                                            //Condition 1
+                                            Transform moveStartCond1 = Transform.Translation(Vector3d.Multiply(RecJointToCurveStartVect, ModJointToCurveStartDist));
+                                            Transform moveEndCond1 = Transform.Translation(Vector3d.Multiply(RecJointToCurveEndVect, ModJointToCurveEndDist));
+                                            Point3d cond1StartRecJointOrigin = new Point3d(RecJointOrigin);
+                                            Point3d cond1EndRecJointOrigin = new Point3d(RecJointOrigin);
+                                            cond1StartRecJointOrigin.Transform(moveStartCond1);
+                                            cond1EndRecJointOrigin.Transform(moveEndCond1);
+
+                                            //Flip the beam, Condition 2
+                                            Transform moveStartCond2 = Transform.Translation(Vector3d.Multiply(RecJointToCurveStartVect, ModJointToCurveEndDist));
+                                            Transform moveEndCond2 = Transform.Translation(Vector3d.Multiply(RecJointToCurveEndVect, ModJointToCurveStartDist));
+                                            Point3d cond2StartRecJointOrigin = new Point3d(RecJointOrigin);
+                                            Point3d cond2EndRecJointOrigin = new Point3d(RecJointOrigin);
+                                            cond2StartRecJointOrigin.Transform(moveStartCond2);
+                                            cond2EndRecJointOrigin.Transform(moveEndCond2);
+
+                                            //if the length is enough then add joint combination group
+                                            //there are two sides of length to compare
+                                            //cut off the length that have: unfit joints and are over threshold, keep the length with joints that are under threshold
+                                            //if the other joints happen to be in the same position as their matching joints then dont cut: distanceModelJointToJoint = distanceRecJointToJoint
+
+                                            //Condition 1 point end distance to curve closest point
+                                            double cond1DistStart = cond1StartRecJointOrigin.DistanceTo(element.Centerline.ClosestPoint(cond1StartRecJointOrigin));
+                                            double cond1DistEnd = cond1EndRecJointOrigin.DistanceTo(element.Centerline.ClosestPoint(cond1EndRecJointOrigin));
+                                            //Condition 2 point end distance
+                                            double cond2DistStart = cond1StartRecJointOrigin.DistanceTo(element.Centerline.ClosestPoint(cond2StartRecJointOrigin));
+                                            double cond2DistEnd = cond2EndRecJointOrigin.DistanceTo(element.Centerline.ClosestPoint(cond2EndRecJointOrigin));
+
+                                            List<Polyline> validFittingJointPl = new List<Polyline>();
+
+                                            //the timber u length is enough, but there are joints in the way that affect the use of u length
+                                            //Condition1
+                                            if (cond1DistStart < 0.03.FromMeter() && cond1DistEnd < 0.03.FromMeter())
+                                            {
+                                                ValidCondition validCondition = ValidCondition.Valid;
+                                                //split curve into parts that joints should be deleted 
+                                                double cond1StartParam = element.Centerline.ClosestParameter(cond1StartRecJointOrigin);
+                                                double cond1EndParam = element.Centerline.ClosestParameter(cond1EndRecJointOrigin);
+
+                                                List<double> jointParameter = new List<double>
+                                                {
+                                                    cond1StartParam,
+                                                    cond1EndParam,
+                                                };
+                                                List<double> orderJointParam = jointParameter.OrderBy(num => num).ToList();
+                                                List<int> paramKey = new List<int> { 0, 0, };
+                                                List<double> jointUEnds = new List<double>();
+                                                for (int pa = 0; pa < element.Joint.Plane.Count; pa++)
+                                                {
+                                                    //order points by distance to curve start, if another joint is between condition start and end and is too deep, then eliminate option
+                                                    //if not too deep then keep option
+
+                                                    if (pa != eleFitJoint[fj])
+                                                    {
+                                                        //the u ends of the joint, see whether parameter inside start and end
+                                                        Point3d jointUlengthStart = new Point3d(element.Joint.Plane[pa].Origin);
+                                                        Transform moveJointUlengthStart = Transform.Translation(Vector3d.Multiply(RecJointToCurveStartVect, element.Joint.uLength[pa] / 2));
+                                                        jointUlengthStart.Transform(moveJointUlengthStart);
+                                                        Point3d jointUlengthEnd = new Point3d(element.Joint.Plane[pa].Origin);
+                                                        Transform moveJointUlengthEnd = Transform.Translation(Vector3d.Multiply(Vector3d.Negate(RecJointToCurveStartVect), element.Joint.uLength[pa] / 2));
+                                                        jointUlengthEnd.Transform(moveJointUlengthEnd);
+
+                                                        double ulengthStartParam = element.Centerline.ClosestParameter(jointUlengthStart);
+                                                        double ulengthEndParam = element.Centerline.ClosestParameter(jointUlengthEnd);
+                                                        jointUEnds.Add(ulengthStartParam);
+                                                        jointUEnds.Add(ulengthEndParam);
+
+                                                        //see if there is another joint inside the range that is affecting the use of the length
+                                                        for (int ue = 0; ue < jointUEnds.Count; ue++)
+                                                        {
+                                                            if (jointUEnds[ue] > orderJointParam[0]
+                                                                && jointUEnds[ue] < orderJointParam[1]
+                                                                && element.Joint.Depth[pa] > depthThreshold)
+                                                            {
+                                                                validCondition = ValidCondition.Invalid;
+                                                                break;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                if (validCondition == ValidCondition.Valid)
+                                                {
+                                                    Interval useDomain = new Interval(cond1StartParam, cond1EndParam);
+                                                    Polyline usePoly = element.Centerline.Trim(useDomain);
+                                                    validFittingJointPl.Add(usePoly);
+
+                                                    //TO DO: movepiece to joint position
+                                                    //TO DO: remaining lengths of piece
+                                                }
+
+                                            }
+                                            //Condition2
+                                            if (cond2DistStart < 0.05.FromMeter() && cond2DistEnd < 0.05.FromMeter())
+                                            {
+                                                ValidCondition validCondition = ValidCondition.Valid;
+                                                //split curve into parts that joints should be deleted 
+                                                double cond2StartParam = element.Centerline.ClosestParameter(cond2StartRecJointOrigin);
+                                                double cond2EndParam = element.Centerline.ClosestParameter(cond2EndRecJointOrigin);
+
+                                                List<double> jointParameter = new List<double>
+                                                {
+                                                    cond2StartParam,
+                                                    cond2EndParam,
+                                                };
+                                                List<double> orderJointParam = jointParameter.OrderBy(num => num).ToList();
+                                                List<int> paramKey = new List<int> { 0, 0, };
+                                                List<double> jointUEnds = new List<double>();
+                                                for (int pa = 0; pa < element.Joint.Plane.Count; pa++)
+                                                {
+                                                    //order points by distance to curve start, if another joint is between condition start and end and is too deep, then eliminate option
+                                                    //if not too deep then keep option
+
+                                                    if (pa != eleFitJoint[fj])
+                                                    {
+                                                        //the u ends of the joint, see whether parameter inside start and end
+                                                        Point3d jointUlengthStart = new Point3d(element.Joint.Plane[pa].Origin);
+                                                        Transform moveJointUlengthStart = Transform.Translation(Vector3d.Multiply(RecJointToCurveStartVect, element.Joint.uLength[pa] / 2));
+                                                        jointUlengthStart.Transform(moveJointUlengthStart);
+                                                        Point3d jointUlengthEnd = new Point3d(element.Joint.Plane[pa].Origin);
+                                                        Transform moveJointUlengthEnd = Transform.Translation(Vector3d.Multiply(Vector3d.Negate(RecJointToCurveStartVect), element.Joint.uLength[pa] / 2));
+                                                        jointUlengthEnd.Transform(moveJointUlengthEnd);
+
+                                                        double ulengthStartParam = element.Centerline.ClosestParameter(jointUlengthStart);
+                                                        double ulengthEndParam = element.Centerline.ClosestParameter(jointUlengthEnd);
+                                                        jointUEnds.Add(ulengthStartParam);
+                                                        jointUEnds.Add(ulengthEndParam);
+
+                                                        //see if there is another joint inside the range that is affecting the use of the length
+                                                        for (int ue = 0; ue < jointUEnds.Count; ue++)
+                                                        {
+                                                            if (jointUEnds[ue] > orderJointParam[0]
+                                                                && jointUEnds[ue] < orderJointParam[1]
+                                                                && element.Joint.Depth[pa] > depthThreshold)
+                                                            {
+                                                                validCondition = ValidCondition.Invalid;
+                                                                break;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                if (validCondition == ValidCondition.Valid)
+                                                {
+                                                    Interval useDomain = new Interval(cond2StartParam, cond2EndParam);
+                                                    Polyline usePoly = element.Centerline.Trim(useDomain);
+                                                    validFittingJointPl.Add(usePoly);
+                                                }
+                                            }
                                         }
-                                        unfitRecNum.Add(p);
                                     }
                                 }
                             }
-                            //arrange reclaimed timber position several conditions
-                            //use model joint distance to end,and apply the distance to reclaimed joint to see how much material we are cutting off
-                            //List<Plane> dupElJointPlane = new List<Plane>(element.Joint.Plane.Select(pl => pl.Clone()).ToList());
-                            for (int i = 0; i < fitCondition.Count; i++)
+                            
+                            //TO DO:
+                            //reclaimed timber without joints or all the joints are under threshold, then compare beam u,v,w to see if comparable
+                            //last chance for joints: keep if joint depth is under threshold, not then cut away piece
+                            for (int i = 0; i < element.Joint.Depth.Count; i++)
                             {
-                                if (fitCondition[i] != null)
+                                if (element.Joint.Depth[i] < depthThreshold)
                                 {
-                                    //distance of model joint to end of model center curve
-                                    List<int> eleFitJoint = fitCondition[i];
-                                    double ModJointToCurveStartDist = planeList[i].Origin.DistanceTo(centerCurve[b].PointAtStart);
-                                    double ModJointToCurveEndDist = planeList[i].Origin.DistanceTo(centerCurve[b].PointAtEnd);
-                                    Vector3d RecJointToCurveStartVect = centerCurve[b].PointAtStart - planeList[i].Origin;
-                                    Vector3d RecJointToCurveEndVect = centerCurve[b].PointAtStart - planeList[i].Origin;
-                                    RecJointToCurveStartVect.Unitize();
-                                    RecJointToCurveEndVect.Unitize();
 
-                                    for (int fj = 0; fj < eleFitJoint.Count; fj++)
-                                    {
-                                        Point3d RecJointOrigin = element.Joint.Plane[eleFitJoint[fj]].Origin;
-
-                                        //Condition 1
-                                        Transform moveStartCond1 = Transform.Translation(Vector3d.Multiply(RecJointToCurveStartVect, ModJointToCurveStartDist));
-                                        Transform moveEndCond1 = Transform.Translation(Vector3d.Multiply(RecJointToCurveEndVect, ModJointToCurveEndDist));
-                                        Point3d cond1StartRecJointOrigin = new Point3d(RecJointOrigin);
-                                        Point3d cond1EndRecJointOrigin = new Point3d(RecJointOrigin);
-                                        cond1StartRecJointOrigin.Transform(moveStartCond1);
-                                        cond1EndRecJointOrigin.Transform(moveEndCond1);
-
-                                        //Flip the beam, Condition 2
-                                        Transform moveStartCond2 = Transform.Translation(Vector3d.Multiply(RecJointToCurveStartVect, ModJointToCurveEndDist));
-                                        Transform moveEndCond2 = Transform.Translation(Vector3d.Multiply(RecJointToCurveEndVect, ModJointToCurveStartDist));
-                                        Point3d cond2StartRecJointOrigin = new Point3d(RecJointOrigin);
-                                        Point3d cond2EndRecJointOrigin = new Point3d(RecJointOrigin);
-                                        cond2StartRecJointOrigin.Transform(moveStartCond2);
-                                        cond2EndRecJointOrigin.Transform(moveEndCond2);
-
-                                        //if the length is enough then add joint combination group
-                                        //there are two sides of length to compare
-                                        //cut off the length that have: unfit joints and are over threshold, keep the length with joints that are under threshold
-                                        //if the other joints happen to be in the same position as their matching joints then dont cut: distanceModelJointToJoint = distanceRecJointToJoint
-
-                                        //Condition 1 point end distance to curve closest point
-                                        double cond1DistStart = cond1StartRecJointOrigin.DistanceTo(element.Centerline.ClosestPoint(cond1StartRecJointOrigin));
-                                        double cond1DistEnd = cond1EndRecJointOrigin.DistanceTo(element.Centerline.ClosestPoint(cond1EndRecJointOrigin));
-                                        //Condition 2 point end distance
-                                        double cond2DistStart = cond1StartRecJointOrigin.DistanceTo(element.Centerline.ClosestPoint(cond2StartRecJointOrigin));
-                                        double cond2DistEnd = cond2EndRecJointOrigin.DistanceTo(element.Centerline.ClosestPoint(cond2EndRecJointOrigin));
-
-                                        List<Polyline> validFittingJointPl = new List<Polyline>();
-
-                                        //the timber u length is enough, but there are joints in the way that affect the use of u length
-                                        //Condition1
-                                        if (cond1DistStart < 0.03.FromMeter() && cond1DistEnd < 0.03.FromMeter())
-                                        {
-                                            ValidCondition validCondition = ValidCondition.Valid;
-                                            //split curve into parts that joints should be deleted 
-                                            double cond1StartParam = element.Centerline.ClosestParameter(cond1StartRecJointOrigin);
-                                            double cond1EndParam = element.Centerline.ClosestParameter(cond1EndRecJointOrigin);
-
-                                            List<double> jointParameter = new List<double>
-                                            {
-                                                cond1StartParam,
-                                                cond1EndParam,
-                                            };
-                                            List<double> orderJointParam = jointParameter.OrderBy(num => num).ToList();
-                                            List<int> paramKey = new List<int> { 0, 0, };
-                                            List<double> jointUEnds = new List<double>();
-                                            for (int pa = 0; pa < element.Joint.Plane.Count; pa++)
-                                            {
-                                                //order points by distance to curve start, if another joint is between condition start and end and is too deep, then eliminate option
-                                                //if not too deep then keep option
-
-                                                if (pa != eleFitJoint[fj])
-                                                {
-                                                    //the u ends of the joint, see whether parameter inside start and end
-                                                    Point3d jointUlengthStart = new Point3d(element.Joint.Plane[pa].Origin);
-                                                    Transform moveJointUlengthStart = Transform.Translation(Vector3d.Multiply(RecJointToCurveStartVect, element.Joint.uLength[pa] / 2));
-                                                    jointUlengthStart.Transform(moveJointUlengthStart);
-                                                    Point3d jointUlengthEnd = new Point3d(element.Joint.Plane[pa].Origin);
-                                                    Transform moveJointUlengthEnd = Transform.Translation(Vector3d.Multiply(Vector3d.Negate(RecJointToCurveStartVect), element.Joint.uLength[pa] / 2));
-                                                    jointUlengthEnd.Transform(moveJointUlengthEnd);
-
-                                                    double ulengthStartParam = element.Centerline.ClosestParameter(jointUlengthStart);
-                                                    double ulengthEndParam = element.Centerline.ClosestParameter(jointUlengthEnd);
-                                                    jointUEnds.Add(ulengthStartParam);
-                                                    jointUEnds.Add(ulengthEndParam);
-
-                                                    //see if there is another joint inside the range that is affecting the use of the length
-                                                    for (int ue = 0; ue < jointUEnds.Count; ue++)
-                                                    {
-                                                        if (jointUEnds[ue] > orderJointParam[0]
-                                                            && jointUEnds[ue] < orderJointParam[1]
-                                                            && element.Joint.Depth[pa] > depthThreshold)
-                                                        {
-                                                            validCondition = ValidCondition.Invalid;
-                                                            break;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                            if (validCondition == ValidCondition.Valid)
-                                            {
-                                                Interval useDomain = new Interval(cond1StartParam, cond1EndParam);
-                                                Polyline usePoly = element.Centerline.Trim(useDomain);
-                                                validFittingJointPl.Add(usePoly);
-                                            }
-
-                                        }
-                                        //Condition2
-                                        if (cond2DistStart < 0.05.FromMeter() && cond2DistEnd < 0.05.FromMeter())
-                                        {
-                                            ValidCondition validCondition = ValidCondition.Valid;
-                                            //split curve into parts that joints should be deleted 
-                                            double cond2StartParam = element.Centerline.ClosestParameter(cond2StartRecJointOrigin);
-                                            double cond2EndParam = element.Centerline.ClosestParameter(cond2EndRecJointOrigin);
-
-                                            List<double> jointParameter = new List<double>
-                                            {
-                                                cond2StartParam,
-                                                cond2EndParam,
-                                            };
-                                            List<double> orderJointParam = jointParameter.OrderBy(num => num).ToList();
-                                            List<int> paramKey = new List<int> { 0, 0, };
-                                            List<double> jointUEnds = new List<double>();
-                                            for (int pa = 0; pa < element.Joint.Plane.Count; pa++)
-                                            {
-                                                //order points by distance to curve start, if another joint is between condition start and end and is too deep, then eliminate option
-                                                //if not too deep then keep option
-
-                                                if (pa != eleFitJoint[fj])
-                                                {
-                                                    //the u ends of the joint, see whether parameter inside start and end
-                                                    Point3d jointUlengthStart = new Point3d(element.Joint.Plane[pa].Origin);
-                                                    Transform moveJointUlengthStart = Transform.Translation(Vector3d.Multiply(RecJointToCurveStartVect, element.Joint.uLength[pa] / 2));
-                                                    jointUlengthStart.Transform(moveJointUlengthStart);
-                                                    Point3d jointUlengthEnd = new Point3d(element.Joint.Plane[pa].Origin);
-                                                    Transform moveJointUlengthEnd = Transform.Translation(Vector3d.Multiply(Vector3d.Negate(RecJointToCurveStartVect), element.Joint.uLength[pa] / 2));
-                                                    jointUlengthEnd.Transform(moveJointUlengthEnd);
-
-                                                    double ulengthStartParam = element.Centerline.ClosestParameter(jointUlengthStart);
-                                                    double ulengthEndParam = element.Centerline.ClosestParameter(jointUlengthEnd);
-                                                    jointUEnds.Add(ulengthStartParam);
-                                                    jointUEnds.Add(ulengthEndParam);
-
-                                                    //see if there is another joint inside the range that is affecting the use of the length
-                                                    for (int ue = 0; ue < jointUEnds.Count; ue++)
-                                                    {
-                                                        if (jointUEnds[ue] > orderJointParam[0]
-                                                            && jointUEnds[ue] < orderJointParam[1]
-                                                            && element.Joint.Depth[pa] > depthThreshold)
-                                                        {
-                                                            validCondition = ValidCondition.Invalid;
-                                                            break;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                            if (validCondition == ValidCondition.Valid)
-                                            {
-                                                Interval useDomain = new Interval(cond2StartParam, cond2EndParam);
-                                                Polyline usePoly = element.Centerline.Trim(useDomain);
-                                                validFittingJointPl.Add(usePoly);
-                                            }
-                                        }
-                                    }
                                 }
                             }
                         }
 
-                        //reclaimed timber without joints or all the joints are under threshold, then compare beam u,v,w to see if comparable
-                        //last chance for joints: keep if joint depth is under threshold, not then cut away piece
-                        for (int i = 0; i < element.Joint.Depth.Count; i++)
-                        {
-                            if (element.Joint.Depth[i] < depthThreshold)
-                            {
-                               
-                            }
-                        }
+
                     }
                 }
             }
