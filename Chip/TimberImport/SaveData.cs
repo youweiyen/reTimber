@@ -30,7 +30,8 @@ namespace Chip.TimberImport
             pManager.AddGenericParameter("TimberJoint", "TJ", "TimberJoint", GH_ParamAccess.list);
             pManager.AddBooleanParameter("Save", "S", "Save to 3dm File", GH_ParamAccess.item, false);
             pManager[2].Optional = true;
-
+            pManager[0].DataMapping = GH_DataMapping.Flatten;
+            pManager[1].DataMapping = GH_DataMapping.Flatten;
         }
 
         /// <summary>
@@ -53,6 +54,9 @@ namespace Chip.TimberImport
             DA.GetDataList(0, curve_asGoo);
             DA.GetDataList(1, joint_asGoo);
 
+            bool bake = false;
+            DA.GetData(2, ref bake);
+
             List<ReclaimedElement> timberCurve = new List<ReclaimedElement>();
             List<ReclaimedElement> jointCurve = new List<ReclaimedElement>();
 
@@ -70,17 +74,93 @@ namespace Chip.TimberImport
                 jointCurve.Add(jointsingle);
             }
 
+            
+            List<ReclaimedElement> reclaimedTimberElements = new List<ReclaimedElement>();
 
-            for (int i  = 0; i < timberCurve.Count; i++)
+            //for (int i  = 0; i < timberCurve.Count; i++)
+            //{
+            //    timberCurve[i].SegmentedMesh = jointCurve[i].SegmentedMesh;
+            //    timberCurve[i].Joint = jointCurve[i].Joint;
+            //}
+
+            for (int i = 0; i < timberCurve.Count; i++)
             {
-                timberCurve[i].SegmentedMesh = jointCurve[i].SegmentedMesh;
-                timberCurve[i].Joint = jointCurve[i].Joint;
+                ReclaimedElement reclaimedTimber = new ReclaimedElement
+                {
+                    ScannedMesh = timberCurve[i].ScannedMesh,
+                    SegmentedMesh = jointCurve[i].SegmentedMesh,
+                    Centerline = timberCurve[i].Centerline,
+                    uLength = timberCurve[i].uLength,
+                    vLength = timberCurve[i].vLength,
+                    wLength = timberCurve[i].wLength,
+                    Joint = jointCurve[i].Joint,
+                    Boundary = timberCurve[i].Boundary,
+                    Plane = timberCurve[i].Plane
+                };
+
+                reclaimedTimberElements.Add(reclaimedTimber);
             }
 
-            DA.SetDataList(0, timberCurve);
+            DA.SetDataList(0, reclaimedTimberElements);
 
             //TO DO: Save file to 3dm
+            //TO DO: Bake attributes
 
+            Rhino.RhinoDoc doc = Rhino.RhinoDoc.ActiveDoc;
+            string parent = "ReclaimedTimber";
+            if (bake)
+            {
+                //create parent layer
+                int index = doc.Layers.FindByFullPath(parent, -1);
+                if (index < 0) doc.Layers.Add(parent, System.Drawing.Color.Black);
+                index = doc.Layers.FindByFullPath(parent, -1);
+                Rhino.DocObjects.Layer parentLayer = doc.Layers[index];
+
+                //construct child layer
+                for(int la = 0; la < reclaimedTimberElements.Count; la++)
+                {
+                    string child = $"{la}";
+                    Rhino.DocObjects.Layer childLayer = new Rhino.DocObjects.Layer();
+                    childLayer.ParentLayerId = parentLayer.Id;
+                    childLayer.Name = child;
+                    childLayer.Color = System.Drawing.Color.BlueViolet;
+
+                    string childrenName = parent + "::" + child;
+
+                    //create child layer
+                    index = doc.Layers.FindByFullPath(childrenName, -1);
+                    if (index < 0) index = doc.Layers.Add(childLayer);
+
+                    Rhino.DocObjects.ObjectAttributes att = new Rhino.DocObjects.ObjectAttributes();
+
+                    att.LayerIndex = index;
+                    att.SetUserString($"_{la}_Ulength", Math.Round(reclaimedTimberElements[la].uLength, 2).ToString());
+                    att.SetUserString($"_{la}_VLength", Math.Round(reclaimedTimberElements[la].vLength, 2).ToString());
+                    att.SetUserString($"_{la}_WLength", Math.Round(reclaimedTimberElements[la].wLength, 2).ToString());
+
+                    for(int jo = 0; jo < reclaimedTimberElements[la].Joint.Depth.Count; jo++)
+                    {
+                        att.SetUserString($"_{la}_{jo}_Joint_ULength", Math.Round(reclaimedTimberElements[la].Joint.uLength[jo], 2).ToString());
+                        att.SetUserString($"_{la}_{jo}_Joint_VLength", Math.Round(reclaimedTimberElements[la].Joint.vLength[jo], 2).ToString());
+                        att.SetUserString($"_{la}_{jo}_Joint_Depth", Math.Round(reclaimedTimberElements[la].Joint.Depth[jo], 2).ToString());
+                        att.SetUserString($"_{la}_{jo}_Joint_Plane", reclaimedTimberElements[la].Joint.Plane[jo].ToString());
+                        att.SetUserString($"_{la}_{jo}_Joint_Mesh", reclaimedTimberElements[la].Joint.Face[jo].ToString());
+                        att.SetUserString($"_{la}_{jo}_Joint_Bound", reclaimedTimberElements[la].Joint.BoundingBrep[jo].ToString());
+                    }
+
+                    att.SetUserString($"_{la}_Scanned_Mesh", reclaimedTimberElements[la].ScannedMesh.ToString());
+                    att.SetUserString($"_{la}_Segmented_Mesh", reclaimedTimberElements[la].SegmentedMesh.ToString());
+                    att.SetUserString($"_{la}_Boundary", reclaimedTimberElements[la].Boundary.ToString());
+                    att.SetUserString($"_{la}_Plane", reclaimedTimberElements[la].Plane.ToString());
+                    att.SetUserString($"_{la}_Center_Curve", reclaimedTimberElements[la].Centerline.ToString());
+
+                    doc.Objects.Add(reclaimedTimberElements[la].ScannedMesh, att);
+                    //doc.Objects.Add(reclaimedTimberElements[la].SegmentedMesh);
+                    //doc.Objects.Add(reclaimedTimberElements[la].Plane);
+                    //doc.Objects.Add(reclaimedTimberElements[la].Centerline);
+                }
+
+            }
             
         }
 

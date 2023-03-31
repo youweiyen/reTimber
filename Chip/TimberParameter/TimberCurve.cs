@@ -64,8 +64,6 @@ namespace Chip.TimberParameter
             DA.GetDataList(0, ScannedMeshes);
             DA.GetDataList(1, SectionSides);
 
-            timber.ScannedMesh = ScannedMeshes;
-
             //Get Endpoints for contour direction
             List<Point3d> contourEndPoints = new List<Point3d>();
             foreach (Mesh ss in SectionSides)
@@ -94,10 +92,22 @@ namespace Chip.TimberParameter
                 JoinMesh.Append(sm);
             }
 
+            timber.ScannedMesh = JoinMesh;
+            
             //contour crv
             double contourDist = 0.019.FromMeter();
             IEnumerable<Curve> contourcurves = Mesh.CreateContourCurves(JoinMesh, sectionstart, contourEndPoints[1], contourDist, 0.01).ToList();
-            List<Curve> contourCrv = Curve.JoinCurves(contourcurves, contourDist * 0.1, false).ToList();
+            List<Curve> joinCrv = Curve.JoinCurves(contourcurves, contourDist * 0.1, false).ToList();
+            List<Curve> contourCrv = new List<Curve>();
+            //check if curve is closed
+            foreach(Curve crv in joinCrv)
+            {
+                if (crv.MakeClosed(0.1))
+                {
+                    contourCrv.Add(crv);
+                }
+                
+            }
 
             #region dunno
             //List<Curve> contourCrv = new List<Curve>();

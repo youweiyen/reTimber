@@ -6,6 +6,7 @@ using System.Net;
 using Chip.TimberContainer;
 using Chip.UnitHelper;
 using Grasshopper.Kernel;
+using Grasshopper.Kernel.Data;
 using Grasshopper.Kernel.Types;
 using Grasshopper.Kernel.Types.Transforms;
 using Rhino.DocObjects;
@@ -42,10 +43,10 @@ namespace Chip.TimberParameter
         /// </summary>
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
         {
-            pManager.AddMeshParameter("FitPiece", "FP", "Pieces that are  applicable", GH_ParamAccess.list);
-            pManager.AddNumberParameter("WasteSum", "WS", "Cut off length", GH_ParamAccess.list);
-            pManager.AddCurveParameter("C", "c", "c", GH_ParamAccess.list);
-            pManager.AddPointParameter("cP", "cP", "cP", GH_ParamAccess.list);
+            pManager.AddMeshParameter("FitPiece", "FP", "Pieces that are applicable", GH_ParamAccess.tree);
+            pManager.AddCurveParameter("UsedLength", "UL", "Part of Timber that is used", GH_ParamAccess.tree);
+            pManager.AddNumberParameter("WasteSum", "WS", "Cut off length", GH_ParamAccess.tree);
+
         }
 
         /// <summary>
@@ -71,9 +72,10 @@ namespace Chip.TimberParameter
             List<Brep> jointModel = new List<Brep>();
             DA.GetDataList(2, jointModel);
 
-            //Brep Center Curve
+            //Brep Center Curve, Center Vector, Plane
             List<Curve> centerCurve = new List<Curve>();
             List<Vector3d> centerVector = new List<Vector3d>();
+            List<Plane> centerPlane= new List<Plane>();
             foreach(Brep br in modelElement)
             {
                 List<Brep> faceList = new List<Brep>();
@@ -83,14 +85,16 @@ namespace Chip.TimberParameter
                 }
                 List<Brep> orderFace = faceList.OrderBy(face => face.GetArea()).ToList();
                 Vector3d brepVector = AreaMassProperties.Compute(orderFace[1]).Centroid - AreaMassProperties.Compute(orderFace[0]).Centroid;
+                Plane brepPlane = new Plane(AreaMassProperties.Compute(orderFace[0]).Centroid, brepVector);
                 Polyline brepPoly = new Polyline
                 {
                     AreaMassProperties.Compute(orderFace[0]).Centroid,
                     AreaMassProperties.Compute(orderFace[1]).Centroid
                 };
-                brepPoly.ToPolylineCurve();
+
                 centerVector.Add(brepVector);
                 centerCurve.Add(brepPoly.ToPolylineCurve());
+                centerPlane.Add(brepPlane);
             }
 
             double depthThreshold = 0.05.FromMeter();
@@ -99,10 +103,19 @@ namespace Chip.TimberParameter
             //if joint is under threshold, then save joint as possible joint cutting part
             //if over threshold, cut off joint part, and calculate each remaining pieces u length, and save the usable joint position on curve
             //move closed mesh from reused joint part as edge
-            List<Point3d> centertest = new List<Point3d>();
+
+            List<List<List<Mesh>>> assignElements = new List<List<List<Mesh>>>();
+            List<List<List<Polyline>>> assignPoly = new List<List<List<Polyline>>>();
+            List<List<List<double>>> assignWaste = new List<List<List<double>>>();
+
             //model element dimensions, and its joint dimensions
             for (int b  = 0; b < modelElement.Count;b++)
             {
+                //The list of possibility of every element that is possible to assign to model[b]
+                List<List<Mesh>> modelMesh = new List<List<Mesh>>();
+                List<List<Polyline>> modelPoly = new List<List<Polyline>>();
+                List<List<double>> modelWaste = new List<List<double>>();
+
                 List<double> eachEdgeLength = new List<double>();
                 foreach(BrepEdge elemEdge in modelElement[b].Edges)
                 {
@@ -151,7 +164,6 @@ namespace Chip.TimberParameter
                         double distancedepth = faceCenter.DistanceTo(centerCurve[b].PointAt(t));
                         faceBrep.Add(brepFace);
                         faceDepth.Add(distancedepth);
-                        //centertest.Add(faceCenter);
                     }
 
                     var brepAnddepth = faceDepth.Select((d, j) => new { Depth = d, Face = j }).OrderBy(x => x.Depth);
@@ -209,17 +221,25 @@ namespace Chip.TimberParameter
                 {
                     double maxV = vBrep + widthTolerance;
                     double maxW = wBrep + widthTolerance;
+                    //double maxU = uBrep + widthTolerance;
                     double minV = vBrep - widthTolerance;
                     double minW = wBrep - widthTolerance;
+                    double minU = uBrep - widthTolerance;
+
+                    //valid conclusion dataset
+                    List<Polyline> validFittingJointPl = new List<Polyline>();
+                    List<Mesh> validFittingMesh = new List<Mesh>();
+                    List<double> validRemainLength = new List<double>();
 
                     //eliminate the short ones out of the choices
-                    if (element.uLength >= centerCurve[b].GetLength())
+                    if (element.uLength > minU)
                     {
                         
                         //if v and w size is within threshold, valid in either rotation then the timber width is correct
                         if (element.vLength > minV && element.vLength < maxV && element.wLength > minW && element.wLength < maxW
                             || element.wLength > minV && element.wLength < maxV && element.vLength > minW && element.vLength < maxW)
                         {
+
                             //if Joint fits in any of the model joints => FOR PIECES WITH JOINTS
                             if (element.Joint.Face.Count != 0) 
                             {
@@ -305,8 +325,6 @@ namespace Chip.TimberParameter
                                             double cond2DistStart = cond1StartRecJointOrigin.DistanceTo(element.Centerline.ClosestPoint(cond2StartRecJointOrigin));
                                             double cond2DistEnd = cond2EndRecJointOrigin.DistanceTo(element.Centerline.ClosestPoint(cond2EndRecJointOrigin));
 
-                                            List<Polyline> validFittingJointPl = new List<Polyline>();
-
                                             //the timber u length is enough, but there are joints in the way that affect the use of u length
                                             //Condition1
                                             if (cond1DistStart < 0.03.FromMeter() && cond1DistEnd < 0.03.FromMeter())
@@ -344,7 +362,7 @@ namespace Chip.TimberParameter
                                                         jointUEnds.Add(ulengthStartParam);
                                                         jointUEnds.Add(ulengthEndParam);
 
-                                                        //see if there is another joint inside the range that is affecting the use of the length
+                                                        //see if there is another joint inside the range that is affecting the use of the length and is too deep
                                                         for (int ue = 0; ue < jointUEnds.Count; ue++)
                                                         {
                                                             if (jointUEnds[ue] > orderJointParam[0]
@@ -359,12 +377,21 @@ namespace Chip.TimberParameter
                                                 }
                                                 if (validCondition == ValidCondition.Valid)
                                                 {
+                                                    //trim polyline
                                                     Interval useDomain = new Interval(cond1StartParam, cond1EndParam);
                                                     Polyline usePoly = element.Centerline.Trim(useDomain);
-                                                    validFittingJointPl.Add(usePoly);
 
-                                                    //TO DO: movepiece to joint position
-                                                    //TO DO: remaining lengths of piece
+                                                    //move the reclaimed element to the model
+                                                    Transform tranElement = Transform.PlaneToPlane(element.Joint.Plane[eleFitJoint[fj]], planeList[i]);
+                                                    Mesh dupElement = element.ScannedMesh.DuplicateMesh();
+                                                    dupElement.Transform(tranElement);
+
+                                                    //Reamining length
+                                                    double wasteLength = element.uLength - usePoly.Length;
+
+                                                    validFittingMesh.Add(dupElement);
+                                                    validFittingJointPl.Add(usePoly);
+                                                    validRemainLength.Add(wasteLength);
                                                 }
 
                                             }
@@ -419,16 +446,54 @@ namespace Chip.TimberParameter
                                                 }
                                                 if (validCondition == ValidCondition.Valid)
                                                 {
+                                                    //trim polyline
                                                     Interval useDomain = new Interval(cond2StartParam, cond2EndParam);
                                                     Polyline usePoly = element.Centerline.Trim(useDomain);
+
+                                                    //move the reclaimed element to the model
+                                                    Transform tranElement = Transform.PlaneToPlane(element.Joint.Plane[eleFitJoint[fj]], planeList[i]);
+                                                    Mesh dupElement = element.ScannedMesh.DuplicateMesh();
+                                                    dupElement.Transform(tranElement);
+
+                                                    //Reamining length
+                                                    double wasteLength = element.uLength - usePoly.Length;
+
+                                                    validFittingMesh.Add(dupElement);
                                                     validFittingJointPl.Add(usePoly);
+                                                    validRemainLength.Add(wasteLength);
+
                                                 }
                                             }
                                         }
                                     }
                                 }
                             }
-                            
+                            //FOR PIECES WITHOUT JOINTS 
+                            else
+                            {
+                                Vector3d trimVector = element.Centerline[1] - element.Centerline[0];
+                                trimVector.Unitize();
+                                Transform movePoint = Transform.Translation(Vector3d.Multiply(uBrep, trimVector));
+                                Point3d trimPoint = new Point3d(element.Centerline[0]);
+                                trimPoint.Transform(movePoint);
+                                double cutParam = element.Centerline.ClosestParameter(trimPoint);
+                                //trim the centerline
+                                Interval trimFromStart = new Interval(0, cutParam);
+                                Polyline usePoly = element.Centerline.Trim(trimFromStart);
+                                //move the reclaimed element to the model
+                                Transform tranElement = Transform.PlaneToPlane(element.Plane, centerPlane[b]);
+                                Mesh dupElement = element.ScannedMesh.DuplicateMesh();
+                                dupElement.Transform(tranElement);
+
+                                //Reamining length
+                                double wasteLength = element.uLength - uBrep;
+
+                                validFittingMesh.Add(dupElement);
+                                validFittingJointPl.Add(usePoly);
+                                validRemainLength.Add(wasteLength);
+                            }
+                            //long pieces with joints that are close to the end
+
                             //TO DO:
                             //reclaimed timber without joints or all the joints are under threshold, then compare beam u,v,w to see if comparable
                             //last chance for joints: keep if joint depth is under threshold, not then cut away piece
@@ -440,13 +505,69 @@ namespace Chip.TimberParameter
                                 }
                             }
                         }
-
-
+                    }
+                    // For model[b] the possibilities of every element
+                    if(validFittingJointPl.Count != 0 && validFittingMesh.Count != 0 && validRemainLength.Count != 0)
+                    {
+                        modelPoly.Add(validFittingJointPl);
+                        modelMesh.Add(validFittingMesh);
+                        modelWaste.Add(validRemainLength);
+                    }
+                }
+                //for model the possibilities of every model[b]
+                if(modelMesh.Count != 0 && modelPoly.Count != 0 && modelWaste.Count != 0)
+                {
+                    assignElements.Add(modelMesh);
+                    assignPoly.Add(modelPoly);
+                    assignWaste.Add(modelWaste);
+                }
+                
+            }
+            //GH tree structure
+            GH_Structure<IGH_Goo> elementTree = new GH_Structure<IGH_Goo>();
+            for (int i = 0; i < assignElements.Count; i++)
+            {
+                for(int j = 0; j < assignElements[i].Count; j++)
+                {
+                    for(int k = 0; k< assignElements[i][j].Count; k++)
+                    {
+                        GH_Path pth = new GH_Path(i, j, k);
+                        GH_Mesh _mesh = new GH_Mesh(assignElements[i][j][k]);
+                        elementTree.Append(_mesh, pth);
                     }
                 }
             }
-            DA.SetDataList(2, centerCurve);
-            DA.SetDataList(3, centertest);
+            GH_Structure<IGH_Goo> polyTree = new GH_Structure<IGH_Goo>();
+            for (int i = 0; i < assignPoly.Count; i++)
+            {
+                for (int j = 0; j < assignPoly[i].Count; j++)
+                {
+                    for (int k = 0; k < assignPoly[i][j].Count; k++)
+                    {
+                        GH_Path pth = new GH_Path(i, j, k);
+                        GH_Curve _curve = new GH_Curve(assignPoly[i][j][k].ToPolylineCurve());
+                        polyTree.Append(_curve, pth);
+                    }
+                }
+            }
+            GH_Structure<IGH_Goo> wasteTree = new GH_Structure<IGH_Goo>();
+            for (int i = 0; i < assignWaste.Count; i++)
+            {
+                for (int j = 0; j < assignWaste[i].Count; j++)
+                {
+                    for (int k = 0; k < assignWaste[i][j].Count; k++)
+                    {
+                        GH_Path pth = new GH_Path(i, j, k);
+                        GH_Number _num = new GH_Number(assignWaste[i][j][k]);
+                        wasteTree.Append(_num, pth);
+                    }
+                }
+            }
+
+            DA.SetDataTree(0, elementTree);
+            DA.SetDataTree(1, polyTree);
+            DA.SetDataTree(2, wasteTree);
+
         }
 
         public enum ValidCondition

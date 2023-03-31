@@ -233,7 +233,6 @@ namespace Chip.TimberParameter
             }
             
             #endregion
-            //Dictionary<int, Mesh>.ValueCollection meshGroup = jointGroup.Values;
 
             //make boundingbox around joint, for the scanned joints are scattered, and joints sizes can be measured
             //Get aligned object bounding box, same orientation and method as finding bounding box brep for timber element
