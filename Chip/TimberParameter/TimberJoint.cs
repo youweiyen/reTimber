@@ -231,7 +231,7 @@ namespace Chip.TimberParameter
                     }
                 }
             }
-            
+
             #endregion
 
             //make boundingbox around joint, for the scanned joints are scattered, and joints sizes can be measured
@@ -273,27 +273,33 @@ namespace Chip.TimberParameter
                 var brepAnddepth = faceDepth.Select((d, i) => new { Depth = d, Face = i }).OrderBy(x => x.Depth);
                 var closestBrepDepth = brepAnddepth.First();
                 var secondBrepDepth = brepAnddepth.ElementAt(1);
-
-                //if the joint is edge tenon joint, apply uvw 0
+                
+                //if the joint is edge tenon joint, apply uvw 0, neglect the joint, cut it off
                 if (closestBrepDepth.Depth < 0.001 && closestBrepDepth.Depth > -0.001 && secondBrepDepth.Depth < 0.001 && secondBrepDepth.Depth > -0.001)
                 {
-                    //keep the u length since its a length to be cut off
+                    //use u length to cut off curve
                     BrepFace closestBrepFace = faceBrep[closestBrepDepth.Face];
                     BrepFace secondBrepFace = faceBrep[secondBrepDepth.Face];
                     double ulength = closestBrepFace.PointAt(0.5, 0.5).DistanceTo(secondBrepFace.PointAt(0.5, 0.5));
 
-                    depthlist.Add(0);
+                    //For now not much of the length is effected, skip, but future need to cut off centeraxis length
+
+                    #region jointPlane_OBSOLETE
+                    depthlist.Add(-1);
                     ulengthlist.Add(ulength);
-                    vlengthlist.Add(0);
+                    vlengthlist.Add(-1);
 
                     //Joint Position Plane
+                    Point3d closestBrepCenter = AreaMassProperties.Compute(closestBrepFace).Centroid;
+                    Point3d secondBrepCenter = AreaMassProperties.Compute(secondBrepFace).Centroid;
 
-                    Point3d midPoint = new Point3d((closestBrepFace.PointAt(0.5, 0.5).X + secondBrepFace.PointAt(0.5, 0.5).X) / 2,
-                                                    (closestBrepFace.PointAt(0.5, 0.5).X + secondBrepFace.PointAt(0.5, 0.5).X) / 2,
-                                                        (closestBrepFace.PointAt(0.5, 0.5).X + secondBrepFace.PointAt(0.5, 0.5).X) / 2);
+                    Point3d midPoint = new Point3d((closestBrepCenter.X + secondBrepCenter.X) / 2,
+                                                    (closestBrepCenter.Y + secondBrepCenter.Y) / 2,
+                                                        (closestBrepCenter.Z + secondBrepCenter.Z) / 2);
                     centerAxis.ClosestPoint(midPoint, out double pointOnCurveParam);
                     Plane jointPlane = new Plane(centerAxis.PointAt(pointOnCurveParam), closestBrepFace.NormalAt(0.5, 0.5));
                     planeList.Add(jointPlane);
+                    #endregion
                 }
                 //normal joints
                 else
@@ -364,7 +370,6 @@ namespace Chip.TimberParameter
             DA.SetDataList(2, jointGroup);
             //DA.SetDataList(2, JointMeshes);
             DA.SetDataList(3, timberList);
-            //DA.SetDataList(4, jointBreps);
         }
         public void GroupMeshesUsingRTree(List<Mesh> jointMesh, double searchDistance)
         {

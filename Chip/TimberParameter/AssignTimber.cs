@@ -97,8 +97,9 @@ namespace Chip.TimberParameter
                 centerPlane.Add(brepPlane);
             }
 
-            double depthThreshold = 0.05.FromMeter();
-            double widthTolerance = 0.03.FromMeter();
+            double depthThreshold = 0.03.FromMeter();
+            double timberSizeTolerance = 0.03.FromMeter();
+            double jointSizeTolerance = 0.005.FromMeter();
             //if timber v/w length is enough, rotate both ways
             //if joint is under threshold, then save joint as possible joint cutting part
             //if over threshold, cut off joint part, and calculate each remaining pieces u length, and save the usable joint position on curve
@@ -219,12 +220,12 @@ namespace Chip.TimberParameter
                 //try to apply each reclaimed element
                 foreach (ReclaimedElement element in reclaimedTimber)
                 {
-                    double maxV = vBrep + widthTolerance;
-                    double maxW = wBrep + widthTolerance;
+                    double maxV = vBrep + timberSizeTolerance;
+                    double maxW = wBrep + timberSizeTolerance;
                     //double maxU = uBrep + widthTolerance;
-                    double minV = vBrep - widthTolerance;
-                    double minW = wBrep - widthTolerance;
-                    double minU = uBrep - widthTolerance;
+                    double minV = vBrep - timberSizeTolerance;
+                    double minW = wBrep - timberSizeTolerance;
+                    double minU = uBrep - timberSizeTolerance;
 
                     //valid conclusion dataset
                     List<Polyline> validFittingJointPl = new List<Polyline>();
@@ -244,18 +245,23 @@ namespace Chip.TimberParameter
                             if (element.Joint.Face.Count != 0) 
                             {
                                 Dictionary<int, List<int>> fitCondition = new Dictionary<int, List<int>>();
-                                Dictionary<int, List<int>> unfitCondition = new Dictionary<int, List<int>>();
+                                //Dictionary<int, List<int>> unfitCondition = new Dictionary<int, List<int>>();
                                 for (int uL = 0; uL < ulengthlist.Count; uL++)
                                 {
                                     List<int> fitRecNum;
-                                    List<int> unfitRecNum;
+                                    //List<int> unfitRecNum;
                                     //compare to each joint in model element
                                     for (int p = 0; p < element.Joint.Plane.Count; p++)
                                     {
+                                        //if type is end joint(depth = -1), then skip
+                                        if (element.Joint.Depth[p] == -1)
+                                        {
+                                            continue;
+                                        }
                                         //if reclaimed joint size < to cut model joint size
-                                        if (element.Joint.uLength[p] <= ulengthlist[uL]
-                                            && element.Joint.vLength[p] <= vlengthlist[uL]
-                                            && element.Joint.Depth[p] <= depthlist[uL])
+                                        else if (element.Joint.uLength[p] <= ulengthlist[uL] + jointSizeTolerance
+                                            && element.Joint.vLength[p] <= vlengthlist[uL] + jointSizeTolerance
+                                            && element.Joint.Depth[p] <= depthlist[uL] + jointSizeTolerance)
                                         {
                                             if (!fitCondition.TryGetValue(uL, out fitRecNum))
                                             {
@@ -265,16 +271,16 @@ namespace Chip.TimberParameter
                                             fitRecNum.Add(p);
                                             //if(reclaimJointnum.Any(item => item == p) == false)
                                         }
-                                        //else then trim off
-                                        else
-                                        {
-                                            if (!unfitCondition.TryGetValue(uL, out unfitRecNum))
-                                            {
-                                                unfitRecNum = new List<int>();
-                                                unfitCondition.Add(uL, unfitRecNum);
-                                            }
-                                            unfitRecNum.Add(p);
-                                        }
+                                        
+                                        //else
+                                        //{
+                                        //    if (!unfitCondition.TryGetValue(uL, out unfitRecNum))
+                                        //    {
+                                        //        unfitRecNum = new List<int>();
+                                        //        unfitCondition.Add(uL, unfitRecNum);
+                                        //    }
+                                        //    unfitRecNum.Add(p);
+                                        //}
                                     }
                                 }
                                 //arrange reclaimed timber position several conditions
@@ -289,7 +295,7 @@ namespace Chip.TimberParameter
                                         double ModJointToCurveStartDist = planeList[i].Origin.DistanceTo(centerCurve[b].PointAtStart);
                                         double ModJointToCurveEndDist = planeList[i].Origin.DistanceTo(centerCurve[b].PointAtEnd);
                                         Vector3d RecJointToCurveStartVect = centerCurve[b].PointAtStart - planeList[i].Origin;
-                                        Vector3d RecJointToCurveEndVect = centerCurve[b].PointAtStart - planeList[i].Origin;
+                                        Vector3d RecJointToCurveEndVect = centerCurve[b].PointAtEnd - planeList[i].Origin;
                                         RecJointToCurveStartVect.Unitize();
                                         RecJointToCurveEndVect.Unitize();
 
@@ -322,7 +328,7 @@ namespace Chip.TimberParameter
                                             double cond1DistStart = cond1StartRecJointOrigin.DistanceTo(element.Centerline.ClosestPoint(cond1StartRecJointOrigin));
                                             double cond1DistEnd = cond1EndRecJointOrigin.DistanceTo(element.Centerline.ClosestPoint(cond1EndRecJointOrigin));
                                             //Condition 2 point end distance
-                                            double cond2DistStart = cond1StartRecJointOrigin.DistanceTo(element.Centerline.ClosestPoint(cond2StartRecJointOrigin));
+                                            double cond2DistStart = cond2StartRecJointOrigin.DistanceTo(element.Centerline.ClosestPoint(cond2StartRecJointOrigin));
                                             double cond2DistEnd = cond2EndRecJointOrigin.DistanceTo(element.Centerline.ClosestPoint(cond2EndRecJointOrigin));
 
                                             //the timber u length is enough, but there are joints in the way that affect the use of u length
@@ -340,13 +346,12 @@ namespace Chip.TimberParameter
                                                     cond1EndParam,
                                                 };
                                                 List<double> orderJointParam = jointParameter.OrderBy(num => num).ToList();
-                                                List<int> paramKey = new List<int> { 0, 0, };
-                                                List<double> jointUEnds = new List<double>();
+                                               
                                                 for (int pa = 0; pa < element.Joint.Plane.Count; pa++)
                                                 {
                                                     //order points by distance to curve start, if another joint is between condition start and end and is too deep, then eliminate option
                                                     //if not too deep then keep option
-
+                                                    List<double> jointUEnds = new List<double>();
                                                     if (pa != eleFitJoint[fj])
                                                     {
                                                         //the u ends of the joint, see whether parameter inside start and end
@@ -361,17 +366,18 @@ namespace Chip.TimberParameter
                                                         double ulengthEndParam = element.Centerline.ClosestParameter(jointUlengthEnd);
                                                         jointUEnds.Add(ulengthStartParam);
                                                         jointUEnds.Add(ulengthEndParam);
-
-                                                        //see if there is another joint inside the range that is affecting the use of the length and is too deep
-                                                        for (int ue = 0; ue < jointUEnds.Count; ue++)
+                                                    }
+                                                    //see if there is another joint inside the range that is affecting the use of the length and is too deep
+                                                    for (int ue = 0; ue < jointUEnds.Count; ue++)
+                                                    {
+                                                        if (jointUEnds[ue] > orderJointParam[0] && jointUEnds[ue] < orderJointParam[1])
                                                         {
-                                                            if (jointUEnds[ue] > orderJointParam[0]
-                                                                && jointUEnds[ue] < orderJointParam[1]
-                                                                && element.Joint.Depth[pa] > depthThreshold)
+                                                            if(element.Joint.Depth[pa] > depthThreshold)
                                                             {
                                                                 validCondition = ValidCondition.Invalid;
                                                                 break;
                                                             }
+
                                                         }
                                                     }
                                                 }
@@ -409,13 +415,11 @@ namespace Chip.TimberParameter
                                                     cond2EndParam,
                                                 };
                                                 List<double> orderJointParam = jointParameter.OrderBy(num => num).ToList();
-                                                List<int> paramKey = new List<int> { 0, 0, };
-                                                List<double> jointUEnds = new List<double>();
                                                 for (int pa = 0; pa < element.Joint.Plane.Count; pa++)
                                                 {
                                                     //order points by distance to curve start, if another joint is between condition start and end and is too deep, then eliminate option
                                                     //if not too deep then keep option
-
+                                                    List<double> jointUEnds = new List<double>();
                                                     if (pa != eleFitJoint[fj])
                                                     {
                                                         //the u ends of the joint, see whether parameter inside start and end
@@ -430,17 +434,18 @@ namespace Chip.TimberParameter
                                                         double ulengthEndParam = element.Centerline.ClosestParameter(jointUlengthEnd);
                                                         jointUEnds.Add(ulengthStartParam);
                                                         jointUEnds.Add(ulengthEndParam);
-
-                                                        //see if there is another joint inside the range that is affecting the use of the length
-                                                        for (int ue = 0; ue < jointUEnds.Count; ue++)
+                                                    }
+                                                    //see if there is another joint inside the range that is affecting the use of the length
+                                                    for (int ue = 0; ue < jointUEnds.Count; ue++)
+                                                    {
+                                                        if (jointUEnds[ue] > orderJointParam[0] && jointUEnds[ue] < orderJointParam[1])
                                                         {
-                                                            if (jointUEnds[ue] > orderJointParam[0]
-                                                                && jointUEnds[ue] < orderJointParam[1]
-                                                                && element.Joint.Depth[pa] > depthThreshold)
+                                                            if (element.Joint.Depth[pa] > depthThreshold)
                                                             {
                                                                 validCondition = ValidCondition.Invalid;
                                                                 break;
                                                             }
+
                                                         }
                                                     }
                                                 }
@@ -451,7 +456,9 @@ namespace Chip.TimberParameter
                                                     Polyline usePoly = element.Centerline.Trim(useDomain);
 
                                                     //move the reclaimed element to the model
-                                                    Transform tranElement = Transform.PlaneToPlane(element.Joint.Plane[eleFitJoint[fj]], planeList[i]);
+                                                    Plane rotatePlane = new Plane(element.Joint.Plane[eleFitJoint[fj]]);
+                                                    rotatePlane.Rotate(Math.PI, element.Joint.Plane[eleFitJoint[fj]].Normal);
+                                                    Transform tranElement = Transform.PlaneToPlane(rotatePlane, planeList[i]);
                                                     Mesh dupElement = element.ScannedMesh.DuplicateMesh();
                                                     dupElement.Transform(tranElement);
 
@@ -468,9 +475,12 @@ namespace Chip.TimberParameter
                                     }
                                 }
                             }
-                            //FOR PIECES WITHOUT JOINTS 
-                            else
+                            //FOR PIECES WITH ONLY END JOINTS, AND PIECES WITHOUT JOINTS
+                            bool hasOtherJoint = element.Joint.Depth.Any(de => de != -1);
+
+                            if(hasOtherJoint == false)
                             {
+                                //only one side
                                 Vector3d trimVector = element.Centerline[1] - element.Centerline[0];
                                 trimVector.Unitize();
                                 Transform movePoint = Transform.Translation(Vector3d.Multiply(uBrep, trimVector));
@@ -481,7 +491,10 @@ namespace Chip.TimberParameter
                                 Interval trimFromStart = new Interval(0, cutParam);
                                 Polyline usePoly = element.Centerline.Trim(trimFromStart);
                                 //move the reclaimed element to the model
-                                Transform tranElement = Transform.PlaneToPlane(element.Plane, centerPlane[b]);
+                                Vector3d usePolyVector = usePoly[1] - usePoly[0];
+                                Plane usePolyPlane = new Plane(usePoly[0], usePolyVector);
+                                //Transform tranElement = Transform.PlaneToPlane(element.Plane, centerPlane[b]);
+                                Transform tranElement = Transform.PlaneToPlane(usePolyPlane, centerPlane[b]);
                                 Mesh dupElement = element.ScannedMesh.DuplicateMesh();
                                 dupElement.Transform(tranElement);
 
@@ -492,19 +505,10 @@ namespace Chip.TimberParameter
                                 validFittingJointPl.Add(usePoly);
                                 validRemainLength.Add(wasteLength);
                             }
-                            //long pieces with joints that are close to the end
 
-                            //TO DO:
-                            //reclaimed timber without joints or all the joints are under threshold, then compare beam u,v,w to see if comparable
-                            //last chance for joints: keep if joint depth is under threshold, not then cut away piece
-                            for (int i = 0; i < element.Joint.Depth.Count; i++)
-                            {
-                                if (element.Joint.Depth[i] < depthThreshold)
-                                {
-
-                                }
-                            }
                         }
+                        
+
                     }
                     // For model[b] the possibilities of every element
                     if(validFittingJointPl.Count != 0 && validFittingMesh.Count != 0 && validRemainLength.Count != 0)
