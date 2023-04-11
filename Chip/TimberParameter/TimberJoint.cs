@@ -121,34 +121,38 @@ namespace Chip.TimberParameter
             foreach (List<Mesh> meshlists in meshsegs)
             {
                 //largest mesh center, normal and plane
-                Mesh largestmesh = meshlists.OrderByDescending(msh => AreaMassProperties.Compute(msh, true, false, false, false).Area).First();
-                double avX = largestmesh.Normals.Average(normals => normals.X);
-                double avY = largestmesh.Normals.Average(normals => normals.Y);
-                double avZ = largestmesh.Normals.Average(normals => normals.Z);
-                Vector3d faceNormal = new Vector3d(avX, avY, avZ);
-                double centX = largestmesh.Vertices.Average(ver => ver.X);
-                double centY = largestmesh.Vertices.Average(ver => ver.Y);
-                double centZ = largestmesh.Vertices.Average(ver => ver.Z);
-                Point3d faceCenter = new Point3d(centX, centY, centZ);
-                Plane largestPlane = new Plane(faceCenter, faceNormal);
-
-                //move to the origin point to compare z value
-                Transform orientBylargestMesh = Transform.PlaneToPlane(largestPlane, originplane);
-                //Joint Meshes in single list
-                foreach (Mesh msh in meshlists)
+                if(meshlists.Count > 0)
                 {
-                    Mesh dupMsh = new Mesh();
-                    dupMsh.Append(msh);
-                    dupMsh.Transform(orientBylargestMesh);
-                    //z value of each mesh in the list
-                    double depth = dupMsh.Vertices.Average(ver => ver.Z);
+                    Mesh largestmesh = meshlists.OrderByDescending(msh => AreaMassProperties.Compute(msh, true, false, false, false).Area).First();
+                    double avX = largestmesh.Normals.Average(normals => normals.X);
+                    double avY = largestmesh.Normals.Average(normals => normals.Y);
+                    double avZ = largestmesh.Normals.Average(normals => normals.Z);
+                    Vector3d faceNormal = new Vector3d(avX, avY, avZ);
+                    double centX = largestmesh.Vertices.Average(ver => ver.X);
+                    double centY = largestmesh.Vertices.Average(ver => ver.Y);
+                    double centZ = largestmesh.Vertices.Average(ver => ver.Z);
+                    Point3d faceCenter = new Point3d(centX, centY, centZ);
+                    Plane largestPlane = new Plane(faceCenter, faceNormal);
 
-                    if (Math.Abs(depth) > jointdepth)
+                    //move to the origin point to compare z value
+                    Transform orientBylargestMesh = Transform.PlaneToPlane(largestPlane, originplane);
+                    //Joint Meshes in single list
+                    foreach (Mesh msh in meshlists)
                     {
-                        JointMeshes.Add(msh);
-                        //depthList.Add(depth);
+                        Mesh dupMsh = new Mesh();
+                        dupMsh.Append(msh);
+                        dupMsh.Transform(orientBylargestMesh);
+                        //z value of each mesh in the list
+                        double depth = dupMsh.Vertices.Average(ver => ver.Z);
+
+                        if (Math.Abs(depth) > jointdepth)
+                        {
+                            JointMeshes.Add(msh);
+                            //depthList.Add(depth);
+                        }
                     }
                 }
+
 
                 //for showing in datatree
                 foreach (Mesh m in meshlists)
@@ -299,22 +303,27 @@ namespace Chip.TimberParameter
             //Get aligned object bounding box, same orientation and method as finding bounding box brep for timber element
 
             List<Brep>jointBreps= new List<Brep>();
+            List<Mesh> jointMeshes = new List<Mesh>();
             foreach (Mesh joint in jointGroup) 
             {
                 BoundingBox jointBound = joint.GetBoundingBox(boxPlane);
 
                 //if face == 1, then is not joint
-                if(joint.Faces.Count == 1)
+                if(joint.Faces.Count != 1)
                 {
-                    jointGroup.Remove(joint);
-                }
-                //boundingBox to Brep
-                else
-                {
+                    
+                    //boundingBox to Brep
                     Brep jointBrep = Brep.CreateFromBox(jointBound);
-                    jointBrep.Transform(orient);
-                    jointBreps.Add(jointBrep);
+                    if(jointBrep != null)
+                    {
+                        jointBrep.Transform(orient);
+                        jointBreps.Add(jointBrep);
+
+                        jointMeshes.Add(joint);
+                    }
+
                 }
+                
 
             }
 
@@ -434,7 +443,7 @@ namespace Chip.TimberParameter
             }
 
             //add to timber container
-            timberjoint.Face = jointGroup;
+            timberjoint.Face = jointMeshes;
             timberjoint.BoundingBrep= jointBreps;
             timberjoint.Depth = depthlist;
             timberjoint.uLength = ulengthlist;
@@ -447,7 +456,7 @@ namespace Chip.TimberParameter
 
             DA.SetDataTree(0, SeperatedShow);
             DA.SetDataList(1, jointBreps);
-            DA.SetDataList(2, jointGroup);
+            DA.SetDataList(2, jointMeshes);
             //DA.SetDataList(2, JointMeshes);
             DA.SetDataList(3, timberList);
         }

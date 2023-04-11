@@ -402,7 +402,7 @@ namespace Chip.TimberParameter
 
                                             }
                                             //Condition2
-                                            if (cond2DistStart < 0.05.FromMeter() && cond2DistEnd < 0.05.FromMeter())
+                                            if (cond2DistStart < 0.03.FromMeter() && cond2DistEnd < 0.03.FromMeter())
                                             {
                                                 ValidCondition validCondition = ValidCondition.Valid;
                                                 //split curve into parts that joints should be deleted 
