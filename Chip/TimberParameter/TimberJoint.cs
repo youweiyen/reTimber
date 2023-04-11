@@ -42,8 +42,8 @@ namespace Chip.TimberParameter
         /// </summary>
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
-            pManager.AddMeshParameter("NonJoint", "SegMesh", "Non Joint Meshes", GH_ParamAccess.tree);
-            pManager.AddBrepParameter("BoundingBrep", "Br", "Bounding Box Brep", GH_ParamAccess.item);
+            pManager.AddMeshParameter("Surfaces", "S", "Remaining Mesh Surfaces", GH_ParamAccess.tree);
+            pManager.AddBrepParameter("JointBound", "JB", "Bounding Box Brep", GH_ParamAccess.list);
             pManager.AddMeshParameter("JointMesh", "JointMesh", "JointMesh", GH_ParamAccess.list);
             pManager.AddGenericParameter("ReclaimedTimber", "RT", "Timber Joint Data", GH_ParamAccess.list);
         }
@@ -303,10 +303,19 @@ namespace Chip.TimberParameter
             {
                 BoundingBox jointBound = joint.GetBoundingBox(boxPlane);
 
+                //if face == 1, then is not joint
+                if(joint.Faces.Count == 1)
+                {
+                    jointGroup.Remove(joint);
+                }
                 //boundingBox to Brep
-                Brep jointBrep = Brep.CreateFromBox(jointBound);
-                jointBrep.Transform(orient);
-                jointBreps.Add(jointBrep);
+                else
+                {
+                    Brep jointBrep = Brep.CreateFromBox(jointBound);
+                    jointBrep.Transform(orient);
+                    jointBreps.Add(jointBrep);
+                }
+
             }
 
             //JointSize, Depth, UV
@@ -407,9 +416,19 @@ namespace Chip.TimberParameter
                         }
 
                     }
-                    depthlist.Add(depth);
-                    ulengthlist.Add(ulength[0]);
-                    vlengthlist.Add(vlength[0]);
+                    //if joint ulength not identified, then add 0, usually problem is because the center curve is identified uncorrectly
+                    if(ulength.Count != 0)
+                    {
+                        depthlist.Add(depth);
+                        ulengthlist.Add(ulength[0]);
+                        vlengthlist.Add(vlength[0]);
+                    }
+                    else
+                    {
+                        depthlist.Add(0);
+                        ulengthlist.Add(0);
+                        vlengthlist.Add(0);
+                    }
                 }
 
             }
@@ -427,7 +446,7 @@ namespace Chip.TimberParameter
             timberList.Add(timber);
 
             DA.SetDataTree(0, SeperatedShow);
-            DA.SetData(1, boundingBrep);
+            DA.SetDataList(1, jointBreps);
             DA.SetDataList(2, jointGroup);
             //DA.SetDataList(2, JointMeshes);
             DA.SetDataList(3, timberList);
