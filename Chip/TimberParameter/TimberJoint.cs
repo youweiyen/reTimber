@@ -153,7 +153,6 @@ namespace Chip.TimberParameter
                     }
                 }
 
-
                 //for showing in datatree
                 foreach (Mesh m in meshlists)
                 {
@@ -312,7 +311,7 @@ namespace Chip.TimberParameter
                 if(joint.Faces.Count != 1)
                 {
                     
-                    //boundingBox to Brep
+                    //boundingBox to Brep, if brep is null, then the joint is a flat single mesh
                     Brep jointBrep = Brep.CreateFromBox(jointBound);
                     if(jointBrep != null)
                     {
@@ -324,7 +323,6 @@ namespace Chip.TimberParameter
 
                 }
                 
-
             }
 
             //JointSize, Depth, UV

@@ -60,16 +60,19 @@ namespace Chip.TimberImport
             List<ReclaimedElement> timberCurve = new List<ReclaimedElement>();
             List<ReclaimedElement> jointCurve = new List<ReclaimedElement>();
 
+            //IEnumerable<ReclaimedElement> curvegoo = curve_asGoo.Cast<ReclaimedElement>();
+            //curvegoo.ToList();
+
             foreach (IGH_Goo curveGoo in curve_asGoo)
             {
-                ReclaimedElement curvesingle = new ReclaimedElement();
+                ReclaimedElement curvesingle;
                 curveGoo.CastTo(out curvesingle);
                 timberCurve.Add(curvesingle);
             }
 
             foreach (IGH_Goo jointGoo in joint_asGoo)
             {
-                ReclaimedElement jointsingle = new ReclaimedElement();
+                ReclaimedElement jointsingle;
                 jointGoo.CastTo(out jointsingle);
                 jointCurve.Add(jointsingle);
             }
