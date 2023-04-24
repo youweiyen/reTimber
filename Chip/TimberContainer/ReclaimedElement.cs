@@ -9,9 +9,10 @@ using System.Threading.Tasks;
 
 namespace Chip.TimberContainer
 {
-    
+
     public class ReclaimedElement
     {
+        public List <ReclaimedElement> reclaimed { get; set; } = new List<ReclaimedElement>();
         /// <summary>
         /// closed mesh of scanned timber
         /// </summary>
