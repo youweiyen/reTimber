@@ -36,6 +36,15 @@ namespace Chip.UnitHelper
                     throw new Exception("unknown units");
             }
         }
+
+        public static double ToRadians(this double degree)
+        {
+            return (Math.PI / 180) * degree;
+        }
+        public static double ToDegrees(this double radians)
+        {
+            return (180 / Math.PI) * radians;
+        }
     }
     
 }

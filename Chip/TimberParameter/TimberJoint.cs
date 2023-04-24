@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Chip.TimberContainer;
+//using RecTimberClass;
 using Grasshopper;
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Data;
@@ -10,6 +11,7 @@ using Rhino.Geometry;
 using Rhino.Geometry.Collections;
 using Chip.UnitHelper;
 using System.IO.IsolatedStorage;
+using System.Net.Configuration;
 
 namespace Chip.TimberParameter
 {
@@ -22,6 +24,8 @@ namespace Chip.TimberParameter
           : base("TimberJoint", "TJ", "Find Timber Joints", "Chip", "Geometry")
         {
         }
+
+        List<ReclaimedElement> timberList = new List<ReclaimedElement>();
 
         /// <summary>
         /// Registers all the input parameters for this component.
@@ -38,9 +42,10 @@ namespace Chip.TimberParameter
         /// </summary>
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
-            pManager.AddMeshParameter("NonJoint", "SegMesh", "Non Joint Meshes", GH_ParamAccess.tree);
-            pManager.AddBrepParameter("BoundingBrep", "Br", "Bounding Box Brep", GH_ParamAccess.item);
+            pManager.AddMeshParameter("Surfaces", "S", "Remaining Mesh Surfaces", GH_ParamAccess.tree);
+            pManager.AddBrepParameter("JointBound", "JB", "Bounding Box Brep", GH_ParamAccess.list);
             pManager.AddMeshParameter("JointMesh", "JointMesh", "JointMesh", GH_ParamAccess.list);
+            pManager.AddGenericParameter("ReclaimedTimber", "RT", "Timber Joint Data", GH_ParamAccess.list);
         }
 
         /// <summary>
@@ -49,13 +54,13 @@ namespace Chip.TimberParameter
         /// <param name="DA">The DA object is used to retrieve from inputs and store in outputs.</param>
         protected override void SolveInstance(IGH_DataAccess DA)
         {
+            timberList.Clear();
             ReclaimedElement timber = new ReclaimedElement();
             //List<Mesh> meshFaces = timber.SegmentedMesh;
             List<Mesh> meshFaces = new List<Mesh>();
             Curve centerAxis = null;
             DA.GetDataList(0, meshFaces);
             DA.GetData(1, ref centerAxis);
-
 
             //Get aligned object bounding box
             Point3d startpoint = centerAxis.PointAtStart;
@@ -72,7 +77,7 @@ namespace Chip.TimberParameter
             Brep boundingBrep = Brep.CreateFromBox(boundingBox);
             boundingBrep.Transform(orient);
             //Add to timber
-            timber.Boundary = boundingBrep;
+            //timber.Boundary = boundingBrep;
             timber.SegmentedMesh = meshFaces;
 
 
@@ -116,34 +121,38 @@ namespace Chip.TimberParameter
             foreach (List<Mesh> meshlists in meshsegs)
             {
                 //largest mesh center, normal and plane
-                Mesh largestmesh = meshlists.OrderByDescending(msh => AreaMassProperties.Compute(msh, true, false, false, false).Area).First();
-                double avX = largestmesh.Normals.Average(normals => normals.X);
-                double avY = largestmesh.Normals.Average(normals => normals.Y);
-                double avZ = largestmesh.Normals.Average(normals => normals.Z);
-                Vector3d faceNormal = new Vector3d(avX, avY, avZ);
-                double centX = largestmesh.Vertices.Average(ver => ver.X);
-                double centY = largestmesh.Vertices.Average(ver => ver.Y);
-                double centZ = largestmesh.Vertices.Average(ver => ver.Z);
-                Point3d faceCenter = new Point3d(centX, centY, centZ);
-                Plane largestPlane = new Plane(faceCenter, faceNormal);
-
-                //move to the origin point to compare z value
-                Transform orientBylargestMesh = Transform.PlaneToPlane(largestPlane, originplane);
-                //Joint Meshes in single list
-                foreach (Mesh msh in meshlists)
+                if(meshlists.Count > 0)
                 {
-                    Mesh dupMsh = new Mesh();
-                    dupMsh.Append(msh);
-                    dupMsh.Transform(orientBylargestMesh);
-                    //z value of each mesh in the list
-                    double depth = dupMsh.Vertices.Average(ver => ver.Z);
+                    Mesh largestmesh = meshlists.OrderByDescending(msh => AreaMassProperties.Compute(msh, true, false, false, false).Area).First();
+                    double avX = largestmesh.Normals.Average(normals => normals.X);
+                    double avY = largestmesh.Normals.Average(normals => normals.Y);
+                    double avZ = largestmesh.Normals.Average(normals => normals.Z);
+                    Vector3d faceNormal = new Vector3d(avX, avY, avZ);
+                    double centX = largestmesh.Vertices.Average(ver => ver.X);
+                    double centY = largestmesh.Vertices.Average(ver => ver.Y);
+                    double centZ = largestmesh.Vertices.Average(ver => ver.Z);
+                    Point3d faceCenter = new Point3d(centX, centY, centZ);
+                    Plane largestPlane = new Plane(faceCenter, faceNormal);
 
-                    if (Math.Abs(depth) > jointdepth)
+                    //move to the origin point to compare z value
+                    Transform orientBylargestMesh = Transform.PlaneToPlane(largestPlane, originplane);
+                    //Joint Meshes in single list
+                    foreach (Mesh msh in meshlists)
                     {
-                        JointMeshes.Add(msh);
-                        //depthList.Add(depth);
+                        Mesh dupMsh = new Mesh();
+                        dupMsh.Append(msh);
+                        dupMsh.Transform(orientBylargestMesh);
+                        //z value of each mesh in the list
+                        double depth = dupMsh.Vertices.Average(ver => ver.Z);
+
+                        if (Math.Abs(depth) > jointdepth)
+                        {
+                            JointMeshes.Add(msh);
+                            //depthList.Add(depth);
+                        }
                     }
                 }
+
 
                 //for showing in datatree
                 foreach (Mesh m in meshlists)
@@ -154,84 +163,302 @@ namespace Chip.TimberParameter
                 j++;
             }
             #region jointGroup
-            ////make joint meshes into joint group
-            ////RTree rTree = new RTree();
-            //List<int> grouped = new List<int>();
-            ////Dictionary<int, Mesh> jointGroup = new Dictionary<int, Mesh>();
+            //make joint meshes into joint group
+            //not rtree
+
             //List<Mesh> jointGroup = new List<Mesh>();
-            //double searchDistance = 0.06.FromMeter();
-
-            //for (int p = 0; p < JointMeshes.Count; p++)
+            //if(JointMeshes.Count != 0)
             //{
-            //    if (grouped.Contains(p))
+            //    if (JointMeshes[0].Vertices.Count < 100)
             //    {
-            //        continue;
-            //    }
-            //    Mesh groupMesh = new Mesh();
-            //    groupMesh.Append(JointMeshes[p]);
-            //    grouped.Add(p);
-            //    for (int k = 0; k < JointMeshes.Count; k++)
-            //    {
-            //        if (p == k)
+            //        List<int> grouped = new List<int>();
+            //        double searchDistance = 0.06.FromMeter();
+            //        for (int p = 0; p < JointMeshes.Count; p++)
             //        {
-            //            continue;
-            //        }
-            //        if (grouped.Contains(k))
-            //        {
-            //            continue;
-            //        }
-            //        List<Point3d> verticesToCompare = new List<Point3d>();
-            //        for (int i = 0; i < JointMeshes[k].Vertices.Count; i++)
-            //        {
-            //            //rTree.Insert(JointMeshes[k].Vertices[i], i);
-            //            verticesToCompare.Add(JointMeshes[k].Vertices[i]);
-            //        }
-            //        List<Point3d> verticesToFind = new List<Point3d>();
-            //        for (int i = 0; i < JointMeshes[p].Vertices.Count; i++)
-            //        {
-            //            //Point3d vI = JointMeshes[p].Vertices[i];
-            //            //Sphere searchSphere = new Sphere(vI, searchDistance);
-
-            //            //rTree.Search(searchSphere,
-            //            //    (sender, args) => { if (i < args.Id)
-            //            //        {
-            //            //            grouped.Add(k); 
-            //            //            groupMesh.Append(JointMeshes[k]);
-
-            //            //        } });
-            //            verticesToFind.Add(JointMeshes[p].Vertices[i]);
-            //        }
-            //        foreach (Point3d vertCompare in verticesToCompare)
-            //        {
-            //            foreach(Point3d vertFind in verticesToFind)
+            //            if (grouped.Contains(p))
             //            {
-            //                if (vertCompare.DistanceTo(vertFind) < searchDistance)
+            //                continue;
+            //            }
+
+            //            Mesh groupMesh = new Mesh();
+            //            groupMesh.Append(JointMeshes[p]);
+            //            grouped.Add(p);
+
+            //            for (int k = 0; k < JointMeshes.Count; k++)
+            //            {
+            //                if (p == k)
             //                {
-            //                    grouped.Add(k);
-            //                    groupMesh.Append(JointMeshes[k]);
             //                    continue;
             //                }
+            //                if (grouped.Contains(k))
+            //                {
+            //                    continue;
+            //                }
+            //                List<Point3d> verticesToCompare = new List<Point3d>();
 
+            //                for (int i = 0; i < JointMeshes[k].Vertices.Count; i++)
+            //                {
+            //                    verticesToCompare.Add(JointMeshes[k].Vertices[i]);
+            //                }
+            //                List<Point3d> verticesToFind = new List<Point3d>();
+            //                List<Point3d> treeClosestPoint= new List<Point3d>();
+            //                List<int> treeClosestInt = new List<int>();
+            //                for (int i = 0; i < JointMeshes[p].Vertices.Count; i++)
+            //                {
+            //                    verticesToFind.Add(JointMeshes[p].Vertices[i]);
+            //                }
+            //                foreach (Point3d vertCompare in verticesToCompare)
+            //                {
+            //                    foreach (Point3d vertFind in verticesToFind)
+            //                    {
+            //                        if (vertCompare.DistanceTo(vertFind) < searchDistance)
+            //                        {
+            //                            grouped.Add(k);
+            //                            groupMesh.Append(JointMeshes[k]);
+            //                            continue;
+            //                        }
+
+            //                    }
+            //                }
             //            }
+            //            //jointGroup.Add(p, groupMesh);
+            //            jointGroup.Add(groupMesh);
             //        }
             //    }
-            //    //jointGroup.Add(p, groupMesh);
-            //    jointGroup.Add(groupMesh);
             //}
+
             #endregion
-            //Dictionary<int, Mesh>.ValueCollection meshGroup = jointGroup.Values;
+
+            #region jointGroup_RTree
+            List<Mesh> jointGroup = new List<Mesh>();
+            if (JointMeshes.Count != 0)
+            {
+                List<int> alreadyGrouped = new List<int>();
+                double searchDistance = 0.06.FromMeter();
+
+                for (int p = 0; p < JointMeshes.Count; p++)
+                {
+                    if (alreadyGrouped.Contains(p))
+                    {
+                        continue;
+                    }
+
+                    Mesh groupMesh = new Mesh();
+                    groupMesh.Append(JointMeshes[p]);
+                    alreadyGrouped.Add(p);
+
+                    for (int k = 0; k < JointMeshes.Count; k++)
+                    {
+                        if (p == k)
+                        {
+                            continue;
+                        }
+                        if (alreadyGrouped.Contains(k))
+                        {
+                            continue;
+                        }
+                        try
+                        {
+                            RTree tree = new RTree();
+
+                            for (int t = 0; t < JointMeshes[k].Vertices.Count; t++)
+                            {
+                                tree.Insert(JointMeshes[k].Vertices[t], t);
+                            }
+
+                            //List<Point3d> treeClosestPoint = new List<Point3d>();
+                            List<int> treeClosestInt = new List<int>();
+
+                            for (int i = 0; i < JointMeshes[p].Vertices.Count; i++)
+                            {
+                                Point3d vI = JointMeshes[p].Vertices[i];
+                                Sphere searchSphere = new Sphere(vI, searchDistance);
+
+                                tree.Search(searchSphere, (object sender, RTreeEventArgs events) =>
+                                {
+                                    // this will be execute for each point that matches the radius.
+                                    RTreeEventArgs e = events;
+                                    // look up which point this is
+                                    //treeClosestPoint.Add(JointMeshes[k].Vertices[e.Id]);
+                                    treeClosestInt.Add(e.Id);
+                                });
+                            }
+                            if (treeClosestInt.Count != 0)
+                            {
+                                groupMesh.Append(JointMeshes[k]);
+                                alreadyGrouped.Add(k);
+                            }
+                        } 
+                        catch (Exception e)
+                        {
+                            throw new Exception(e.Message + " " + e.StackTrace);
+                        }
+                    }
+                    jointGroup.Add(groupMesh);
+                }
+            }
+            #endregion
+
             //make boundingbox around joint, for the scanned joints are scattered, and joints sizes can be measured
+            //Get aligned object bounding box, same orientation and method as finding bounding box brep for timber element
+
+            List<Brep>jointBreps= new List<Brep>();
+            List<Mesh> jointMeshes = new List<Mesh>();
+            foreach (Mesh joint in jointGroup) 
+            {
+                BoundingBox jointBound = joint.GetBoundingBox(boxPlane);
+
+                //if face == 1, then is not joint
+                if(joint.Faces.Count != 1)
+                {
+                    
+                    //boundingBox to Brep
+                    Brep jointBrep = Brep.CreateFromBox(jointBound);
+                    if(jointBrep != null)
+                    {
+                        jointBrep.Transform(orient);
+                        jointBreps.Add(jointBrep);
+
+                        jointMeshes.Add(joint);
+                    }
+
+                }
+                
+
+            }
+
+            //JointSize, Depth, UV
+            List<double>depthlist= new List<double>();
+            List<double>ulengthlist= new List<double>();
+            List<double>vlengthlist= new List<double>();
+            List<Plane> planeList = new List<Plane>();
+            
+            foreach (Brep jBox in jointBreps)
+            {
+                //find furthest Brep, find Brep distance to Curve(depth), Brep UV length
+                //joint position on curve
+                List<double> faceDepth = new List<double>();
+                List<BrepFace> faceBrep = new List<BrepFace>();
+                
+                foreach(BrepFace brepFace in jBox.Faces)
+                {
+                    Point3d faceCenter = AreaMassProperties.Compute(brepFace.ToBrep()).Centroid;
+                    centerAxis.ClosestPoint(faceCenter, out double t);
+                    double distancedepth = faceCenter.DistanceTo(centerAxis.PointAt(t));
+                    faceBrep.Add(brepFace);
+                    faceDepth.Add(distancedepth);
+                }
+                
+                var brepAnddepth = faceDepth.Select((d, i) => new { Depth = d, Face = i }).OrderBy(x => x.Depth);
+                var closestBrepDepth = brepAnddepth.First();
+                var secondBrepDepth = brepAnddepth.ElementAt(1);
+                
+                //if the joint is edge tenon joint, apply uvw 0, neglect the joint, cut it off
+                if (closestBrepDepth.Depth < 0.001 && closestBrepDepth.Depth > -0.001 && secondBrepDepth.Depth < 0.001 && secondBrepDepth.Depth > -0.001)
+                {
+                    //use u length to cut off curve
+                    BrepFace closestBrepFace = faceBrep[closestBrepDepth.Face];
+                    BrepFace secondBrepFace = faceBrep[secondBrepDepth.Face];
+                    double ulength = closestBrepFace.PointAt(0.5, 0.5).DistanceTo(secondBrepFace.PointAt(0.5, 0.5));
+
+                    //For now not much of the length is effected, skip, but future need to cut off centeraxis length
+
+                    #region jointPlane_OBSOLETE
+                    depthlist.Add(-1);
+                    ulengthlist.Add(ulength);
+                    vlengthlist.Add(-1);
+
+                    //Joint Position Plane
+                    Point3d closestBrepCenter = AreaMassProperties.Compute(closestBrepFace).Centroid;
+                    Point3d secondBrepCenter = AreaMassProperties.Compute(secondBrepFace).Centroid;
+
+                    Point3d midPoint = new Point3d((closestBrepCenter.X + secondBrepCenter.X) / 2,
+                                                    (closestBrepCenter.Y + secondBrepCenter.Y) / 2,
+                                                        (closestBrepCenter.Z + secondBrepCenter.Z) / 2);
+                    centerAxis.ClosestPoint(midPoint, out double pointOnCurveParam);
+                    Plane jointPlane = new Plane(centerAxis.PointAt(pointOnCurveParam), closestBrepFace.NormalAt(0.5, 0.5));
+                    planeList.Add(jointPlane);
+                    #endregion
+                }
+                //normal joints
+                else
+                {
+                    //Joint Depth
+                    double depth = 0;
+                    for (int cl = 0; cl < faceBrep.Count; cl++)
+                    {
+                        Vector3d eachNormal = faceBrep[cl].NormalAt(0.5, 0.5);
+                        Vector3d closestNormal = faceBrep[closestBrepDepth.Face].NormalAt(0.5, 0.5);
+                        double oppositeAngle = Vector3d.VectorAngle(eachNormal, closestNormal);
+                        if (oppositeAngle.ToDegrees() < 190 && oppositeAngle.ToDegrees() > 170)
+                        {
+                            double dist = AreaMassProperties.Compute(faceBrep[cl].ToBrep()).Centroid
+                                .DistanceTo(AreaMassProperties.Compute(faceBrep[closestBrepDepth.Face].ToBrep()).Centroid);
+                            depth = dist;
+                        }
+                    }
+
+                    //Joint Position Plane
+                    BrepFace closestBrepFace = faceBrep[closestBrepDepth.Face];
+                    centerAxis.ClosestPoint(closestBrepFace.PointAt(0.5, 0.5), out double pointOnCurveParam);
+                    Plane jointPlane = new Plane(centerAxis.PointAt(pointOnCurveParam), closestBrepFace.NormalAt(0.5, 0.5));
+                    planeList.Add(jointPlane);
+
+                    //Joint UV Length
+                    List<double> ulength = new List<double>();
+                    List<double> vlength = new List<double>();
+                    Brep closestBrep = closestBrepFace.ToBrep();
+
+                    for (int i = 0; i < closestBrep.Edges.Count; i++)
+                    {
+                        Vector3d edgeVector = closestBrep.Edges[i].PointAtEnd - closestBrep.Edges[i].PointAtStart;
+                        //centerVector is boundingbox orientation vector
+                        double edgeAngle = Vector3d.VectorAngle(edgeVector, centerVector);
+
+                        if (80 < edgeAngle.ToDegrees() && edgeAngle.ToDegrees() < 100)
+                        {
+                            vlength.Add(closestBrep.Edges[i].GetLength());
+                        }
+                        else
+                        {
+                            ulength.Add(closestBrep.Edges[i].GetLength());
+                        }
+
+                    }
+                    //if joint ulength not identified, then add 0, usually problem is because the center curve is identified uncorrectly
+                    if(ulength.Count != 0)
+                    {
+                        depthlist.Add(depth);
+                        ulengthlist.Add(ulength[0]);
+                        vlengthlist.Add(vlength[0]);
+                    }
+                    else
+                    {
+                        depthlist.Add(0);
+                        ulengthlist.Add(0);
+                        vlengthlist.Add(0);
+                    }
+                }
+
+            }
 
             //add to timber container
-            //timberjoint.Face = jointGroup;
-            //timberjoint.Depth = depthList;
-            List<Joint> timberJoints = new List<Joint> { timberjoint };
-            timber.Joint = timberJoints;
+            timberjoint.Face = jointMeshes;
+            timberjoint.BoundingBrep= jointBreps;
+            timberjoint.Depth = depthlist;
+            timberjoint.uLength = ulengthlist;
+            timberjoint.vLength = vlengthlist;
+            timberjoint.Plane = planeList;
+            timber.Joint = timberjoint;
+            
+            //add to list
+            timberList.Add(timber);
 
             DA.SetDataTree(0, SeperatedShow);
-            DA.SetData(1, boundingBrep);
-            //DA.SetDataList(2, jointGroup);
-            DA.SetDataList(2, JointMeshes);
+            DA.SetDataList(1, jointBreps);
+            DA.SetDataList(2, jointMeshes);
+            //DA.SetDataList(2, JointMeshes);
+            DA.SetDataList(3, timberList);
         }
         public void GroupMeshesUsingRTree(List<Mesh> jointMesh, double searchDistance)
         {
@@ -271,6 +498,7 @@ namespace Chip.TimberParameter
             }
             //return jointGroup;
         }
+
         /// <summary>
         /// Provides an Icon for the component.
         /// </summary>

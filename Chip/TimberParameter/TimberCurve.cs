@@ -7,6 +7,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using Chip.UnitHelper;
 using Chip.TimberContainer;
+//using RecTimberClass;
 
 namespace Chip.TimberParameter
 {
@@ -24,6 +25,7 @@ namespace Chip.TimberParameter
         {
         }
         //List<Curve> previewCurve = new List<Curve>();
+        List<ReclaimedElement> timberList = new List<ReclaimedElement>();
 
         /// <summary>
         /// Registers all the input parameters for this component.
@@ -34,6 +36,7 @@ namespace Chip.TimberParameter
             pManager.AddMeshParameter("SectionSides", "SectionSides", "SectionSides", GH_ParamAccess.list);
         }
 
+        
         /// <summary>
         /// Registers all the output parameters for this component.
         /// </summary>
@@ -43,6 +46,8 @@ namespace Chip.TimberParameter
             pManager.AddGeometryParameter("Section", "Section", "Section", GH_ParamAccess.list);
             //pManager.AddGeometryParameter("CenterCurve", "CenterCurve", "CenterCurve", GH_ParamAccess.list);
             pManager.AddGeometryParameter("CenterCurve", "CenterCurve", "CenterCurve", GH_ParamAccess.item);
+            pManager.AddGenericParameter("ReclaimedTimber", "RT", "Timber Curve Data", GH_ParamAccess.list);
+            pManager.AddGeometryParameter("testbox", "tb", "testbox", GH_ParamAccess.item);
         }
 
         /// <summary>
@@ -52,13 +57,12 @@ namespace Chip.TimberParameter
         /// to store data in output parameters.</param>
         protected override void SolveInstance(IGH_DataAccess DA)
         {
+            timberList.Clear();
             ReclaimedElement timber = new ReclaimedElement();
             List<Mesh> ScannedMeshes = new List<Mesh>();
             List<Mesh> SectionSides = new List<Mesh>();
             DA.GetDataList(0, ScannedMeshes);
             DA.GetDataList(1, SectionSides);
-
-            timber.ScannedMesh = ScannedMeshes;
 
             //Get Endpoints for contour direction
             List<Point3d> contourEndPoints = new List<Point3d>();
@@ -88,10 +92,22 @@ namespace Chip.TimberParameter
                 JoinMesh.Append(sm);
             }
 
+            timber.ScannedMesh = JoinMesh;
+            
             //contour crv
-            double contourDist = 0.02.FromMeter();
+            double contourDist = 0.019.FromMeter();
             IEnumerable<Curve> contourcurves = Mesh.CreateContourCurves(JoinMesh, sectionstart, contourEndPoints[1], contourDist, 0.01).ToList();
-            List<Curve> contourCrv = Curve.JoinCurves(contourcurves, contourDist * 0.1, false).ToList();
+            List<Curve> joinCrv = Curve.JoinCurves(contourcurves, contourDist * 0.1, false).ToList();
+            List<Curve> contourCrv = new List<Curve>();
+            //check if curve is closed
+            foreach(Curve crv in joinCrv)
+            {
+                if (crv.MakeClosed(0.1))
+                {
+                    contourCrv.Add(crv);
+                }
+                
+            }
 
             #region dunno
             //List<Curve> contourCrv = new List<Curve>();
@@ -293,13 +309,62 @@ namespace Chip.TimberParameter
             {
                 centeraxis.Add(aP);
             }
+
+            //Timber Dimension
+            //Get aligned object bounding box
+            Vector3d centerVector = contourEndPoints[1] - contourEndPoints[0];
+            Plane boxPlane = new Plane(contourEndPoints[0], centerVector);
+            //plane aligned to origin. transform brep to aligned object
+            Plane originplane = new Plane(new Point3d(0, 0, 0), new Vector3d(0, 0, 1));
+            BoundingBox boundingBox = JoinMesh.GetBoundingBox(boxPlane);
+            Transform orient = Transform.PlaneToPlane(originplane, boxPlane);
+            //boundingBox to Brep
+            Brep boundingBrep = Brep.CreateFromBox(boundingBox);
+            boundingBrep.Transform(orient);
+            
+            List<double> allEdgeLength = new List<double>();
+            foreach(BrepEdge edge in boundingBrep.Edges)
+            {
+                allEdgeLength.Add(edge.GetLength());
+            }
+
+            List<double>singleLength = allEdgeLength.Distinct().OrderBy(edgeLength => edgeLength).ToList();
+
+            double ulength, vlength, wlength;
+
+            if (singleLength.Count == 2)
+            {
+                ulength = singleLength[1];
+                vlength = singleLength[0];
+                wlength = singleLength[0];
+            }
+            else
+            {
+                vlength = singleLength[0];
+                wlength = singleLength[1];
+                ulength = singleLength[2];
+            }
+            //timber plane
+            Plane timberPlane = new Plane(centeraxis.ToPolylineCurve().PointAtStart, centerVector);
+
+            //Add to timber
+            timber.Boundary = boundingBrep;
             //previewCurve.AddRange(contourCrv);
             timber.Centerline = centeraxis;
+            timber.uLength = ulength;
+            timber.vLength = vlength;
+            timber.wLength = wlength;
+            timber.Plane= timberPlane;
+
+            //Add timber to List
+            timberList.Add(timber);
 
             DA.SetDataList(0, polylines);
             DA.SetDataList(1, contourCrv);
             //DA.SetDataList(2, centerCrv);
             DA.SetData(2, centeraxis);
+            DA.SetDataList(3, timberList);
+            DA.SetData(4, boundingBrep);
 
         }
         #region Preview

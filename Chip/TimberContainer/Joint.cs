@@ -10,9 +10,9 @@ namespace Chip.TimberContainer
     public class Joint
     {
         /// <summary>
-        /// Joint base plane
+        /// Joint Center and position on Curve
         /// </summary>
-        public Plane Plane { get; set; }
+        public List<Plane> Plane { get; set; }
         /// <summary>
         /// joint type
         /// </summary>
@@ -22,13 +22,21 @@ namespace Chip.TimberContainer
         /// </summary>
         public List<double> Depth { get; set; }
         /// <summary>
+        /// u length of joint, parallel to timber center curve
+        /// </summary>
+        public List<double> uLength { get; set; }
+        /// <summary>
+        /// v length of joint, perpendicular to timber center curve
+        /// </summary>
+        public List<double> vLength { get; set; }
+        /// <summary>
         /// joint meshes
         /// </summary>
         public List<Mesh> Face { get; set; }
         /// <summary>
         /// The bounding box of joint meshes since they are not perfectly whole after scan and segmentation
         /// </summary>
-        public BoundingBox BoundingBox { get; set; }
+        public List<Brep> BoundingBrep { get; set; }
 
         //public Joint()
         //{

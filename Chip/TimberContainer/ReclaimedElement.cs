@@ -1,4 +1,5 @@
-﻿using Grasshopper.Kernel.Types;
+﻿using Grasshopper.Kernel;
+using Grasshopper.Kernel.Types;
 using Rhino.Geometry;
 using System;
 using System.Collections.Generic;
@@ -8,12 +9,13 @@ using System.Threading.Tasks;
 
 namespace Chip.TimberContainer
 {
-    public class ReclaimedElement 
+    
+    public class ReclaimedElement
     {
         /// <summary>
         /// closed mesh of scanned timber
         /// </summary>
-        public List<Mesh> ScannedMesh { get; set; }
+        public Mesh ScannedMesh { get; set; }
         /// <summary>
         /// seperated mesh of scanned timber
         /// </summary>
@@ -21,11 +23,19 @@ namespace Chip.TimberContainer
         /// <summary>
         /// timber joint
         /// </summary>
-        public List<Joint> Joint { get; set; }
+        public Joint Joint { get; set; }
         /// <summary>
-        /// section lines of scanned timber
+        /// u length of timber, parallel to timber center curve
         /// </summary>
-        public List<Polyline> Sections { get; set; }
+        public double uLength { get; set; }
+        /// <summary>
+        /// vLength of Timber, first length perpendicular to timber center curve
+        /// </summary>
+        public double vLength { get; set; }
+        /// <summary>
+        /// vLength of Timber, second length perpendicular to timber center curve
+        /// </summary>
+        public double wLength { get; set; }
         /// <summary>
         /// pure centerline of timber
         /// </summary>
@@ -35,11 +45,7 @@ namespace Chip.TimberContainer
         /// </summary>
         public Brep Boundary { get; set; }
         /// <summary>
-        /// normal of every timber surface
-        /// </summary>
-        public List<Vector3d> Normal { get; set; }
-        /// <summary>
-        /// Plane origin of Reclaimed Timber
+        /// Plane origin of Reclaimed Timber, to compare rotated position
         /// </summary>
         public Plane Plane { get; set; }
 
