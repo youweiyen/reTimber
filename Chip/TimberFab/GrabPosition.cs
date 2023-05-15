@@ -181,6 +181,7 @@ namespace Chip.TimberFab
                             double bMArea = AreaMassProperties.Compute(bM, true, false, false, false).Area;
                             if (bMArea > meshSize)
                             {
+                                #region Rtree close surface
                                 try
                                 {
                                     RTree tree = new RTree();
@@ -224,9 +225,30 @@ namespace Chip.TimberFab
                                 catch (Exception e)
                                 {
                                     throw new Exception(e.Message + " " + e.StackTrace);
+
+                                }
+                                #endregion
+
+                                fM.RebuildNormals();
+                                bM.RebuildNormals();
+
+                                double fX = fM.Normals.Average(normals => normals.X);
+                                double fY = fM.Normals.Average(normals => normals.Y);
+                                double fZ = fM.Normals.Average(normals => normals.Z);
+                                Vector3d fNormal = new Vector3d(fX, fY, fZ);
+
+                                double bX = fM.Normals.Average(normals => normals.X);
+                                double bY = fM.Normals.Average(normals => normals.Y);
+                                double bZ = fM.Normals.Average(normals => normals.Z);
+                                Vector3d bNormal = new Vector3d(bX, bY, bZ);
+
+                                double oppositeAngle = Vector3d.VectorAngle(fNormal, bNormal);
+
+                                if(oppositeAngle.ToDegrees() > 90)
+                                {
+                                    
                                 }
                             }
-                            
                         }
                     }
                 }   
