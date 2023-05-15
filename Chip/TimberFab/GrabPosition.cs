@@ -37,7 +37,7 @@ namespace Chip.TimberFab
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
         {
             pManager.AddPlaneParameter("GrabPlane", "GP", "Tool Plane for Grabbing", GH_ParamAccess.list);
-            pManager.AddMeshParameter("GrabSurface", "GS", "WIP Grabbing perpendicular surface", GH_ParamAccess.list);
+            pManager.AddMeshParameter("GrabSurface", "GS", "WIP Grabbing perpendicular surface", GH_ParamAccess.tree);
             pManager.AddMeshParameter("twoSides", "ts", "twoSides", GH_ParamAccess.list);
             pManager.AddBrepParameter("bf", "bf", "bf", GH_ParamAccess.list);
         }
@@ -64,9 +64,12 @@ namespace Chip.TimberFab
                 timber.Add(timberElement);
             }
 
-            List<Mesh> surfaceOptions = new List<Mesh>();
+            
             List<Mesh> twosides= new List<Mesh>();
             List<Brep> bf  = new List<Brep>();
+            DataTree<Mesh> SeperatedShow = new DataTree<Mesh>();
+            int j = 0;
+
             foreach (ReclaimedElement rt in timber)
             {
                 List<Vector3d> rtNormal = new List<Vector3d>();
@@ -113,28 +116,42 @@ namespace Chip.TimberFab
                 //get the surfaces that are the same normal to each faces of the brep
                 //Bounding Brep Normal
                 List<Vector3d> brepfacenormals = new List<Vector3d>();
+                List<Brep> brepfaces = new List<Brep>();
                 Dictionary<int, List<Mesh>> directionMeshes = new Dictionary<int, List<Mesh>>();
                 for (int i = 0; i < rt.Boundary.Faces.Count; i++)
                 {
                     brepfacenormals.Add(rt.Boundary.Faces[i].NormalAt(0.5, 0.5));
+                    brepfaces.Add(rt.Boundary.Faces[i].ToBrep());
                     directionMeshes.Add(i, new List<Mesh>());
                 }
-                //Each Mesh normal
-                foreach (Mesh mF in rt.SegmentedMesh)
+                ////group by Each Mesh normal
+                //foreach (Mesh mF in rt.SegmentedMesh)
+                //{
+                //    mF.UnifyNormals();
+
+                //    double avX = mF.Normals.Average(normals => normals.X);
+                //    double avY = mF.Normals.Average(normals => normals.Y);
+                //    double avZ = mF.Normals.Average(normals => normals.Z);
+                //    Vector3d faceNormal = new Vector3d(avX, avY, avZ);
+
+                //    //foreach mesh, compare and assign to closest brep face normal group 
+                //    Vector3d closestItem = brepfacenormals.OrderByDescending(fc => (faceNormal - fc).Length).Last();
+                //    int closest = brepfacenormals.IndexOf(closestItem);
+                //    directionMeshes[closest].Add(mF);
+                //}
+                //group by closest distance brep
+                foreach(Mesh mF in rt.SegmentedMesh)
                 {
-                    mF.UnifyNormals();
+                    double avX = mF.Vertices.Average(center => center.X);
+                    double avY = mF.Vertices.Average(center => center.Y);
+                    double avZ = mF.Vertices.Average(center => center.Z);
+                    Point3d meshCenterPoint = new Point3d(avX, avY, avZ);
 
-                    double avX = mF.Normals.Average(normals => normals.X);
-                    double avY = mF.Normals.Average(normals => normals.Y);
-                    double avZ = mF.Normals.Average(normals => normals.Z);
-                    Vector3d faceNormal = new Vector3d(avX, avY, avZ);
-
-                    //foreach mesh, compare and assign to closest brep face normal group 
-                    Vector3d closestItem = brepfacenormals.OrderByDescending(fc => (faceNormal - fc).Length).Last();
-                    int closest = brepfacenormals.IndexOf(closestItem);
+                    
+                    Brep closestFace = brepfaces.OrderBy(fc => fc.ClosestPoint(meshCenterPoint).DistanceTo(meshCenterPoint)).First();
+                    int closest = brepfaces.IndexOf(closestFace);
                     directionMeshes[closest].Add(mF);
                 }
-
                 //locate surface and its normal, find the surface closest to its opposite normal
                 int firstFaceInt = rt.Boundary.Faces.OrderBy(brepFace => perpFaces[0].PointAt(0.5, 0.5).DistanceTo(brepFace.PointAt(0.5, 0.5))).First().FaceIndex;
                 int secondFaceInt = rt.Boundary.Faces.OrderBy(brepFace => perpFaces[1].PointAt(0.5, 0.5).DistanceTo(brepFace.PointAt(0.5, 0.5))).First().FaceIndex;
@@ -148,10 +165,11 @@ namespace Chip.TimberFab
                 twosides.AddRange(orderFirstSide);
                 twosides.AddRange(orderSecondSide);
                 //smallest mesh grabbing size
-                double meshSize = 0.1*0.1.FromMeter();
+                double meshSize = 0.01.FromMeter2();
 
                 foreach (Mesh fM in orderFirstSide)
                 {
+                    
                     double fMArea = AreaMassProperties.Compute(fM, true, false, false, false).Area;
                     
                     if (fMArea > meshSize)
@@ -160,50 +178,61 @@ namespace Chip.TimberFab
                         foreach (Mesh bM in orderSecondSide)
                         {
                             List<Mesh> groupMesh = new List<Mesh>();
-
-                            try
+                            double bMArea = AreaMassProperties.Compute(bM, true, false, false, false).Area;
+                            if (bMArea > meshSize)
                             {
-                                RTree tree = new RTree();
-
-                                for (int t = 0; t < bM.Vertices.Count; t++)
+                                try
                                 {
-                                    tree.Insert(bM.Vertices[t], t);
-                                }
+                                    RTree tree = new RTree();
 
-                                //List<Point3d> treeClosestPoint = new List<Point3d>();
-                                List<int> treeClosestInt = new List<int>();
-
-                                for (int i = 0; i < fM.Vertices.Count; i++)
-                                {
-                                    Point3d vI = fM.Vertices[i];
-                                    Sphere searchSphere = new Sphere(vI, timberWidth);
-
-                                    tree.Search(searchSphere, (object sender, RTreeEventArgs events) =>
+                                    for (int t = 0; t < bM.Vertices.Count; t++)
                                     {
-                                        // this will be execute for each point that matches the radius.
-                                        RTreeEventArgs e = events;
-                                        // look up which point this is
-                                        //treeClosestPoint.Add(JointMeshes[k].Vertices[e.Id]);
-                                        treeClosestInt.Add(e.Id);
-                                    });
+                                        tree.Insert(bM.Vertices[t], t);
+                                    }
+
+                                    //List<Point3d> treeClosestPoint = new List<Point3d>();
+                                    List<int> treeClosestInt = new List<int>();
+
+                                    for (int i = 0; i < fM.Vertices.Count; i++)
+                                    {
+                                        Point3d vI = fM.Vertices[i];
+                                        Sphere searchSphere = new Sphere(vI, timberWidth);
+
+                                        tree.Search(searchSphere, (object sender, RTreeEventArgs events) =>
+                                        {
+                                            // this will be execute for each point that matches the radius.
+                                            RTreeEventArgs e = events;
+                                            // look up which point this is
+                                            //treeClosestPoint.Add(JointMeshes[k].Vertices[e.Id]);
+                                            treeClosestInt.Add(e.Id);
+                                        });
+                                    }
+                                    if (treeClosestInt.Count != 0)
+                                    {
+                                        groupMesh.Add(fM);
+                                        groupMesh.Add(bM);
+
+                                        //for showing in datatree
+                                        foreach (Mesh m in groupMesh)
+                                        {
+                                            GH_Path pth = new GH_Path(j);
+                                            SeperatedShow.Add(m, pth);
+                                        }
+                                        j++;
+                                    }
                                 }
-                                if (treeClosestInt.Count != 0)
+                                catch (Exception e)
                                 {
-                                    groupMesh.Add(fM);
-                                    groupMesh.Add(bM);
-                                    surfaceOptions.AddRange(groupMesh);
+                                    throw new Exception(e.Message + " " + e.StackTrace);
                                 }
                             }
-                            catch (Exception e)
-                            {
-                                throw new Exception(e.Message + " " + e.StackTrace);
-                            }
+                            
                         }
                     }
                 }   
                     
             }
-            DA.SetDataList(1, surfaceOptions);
+            DA.SetDataTree(1, SeperatedShow);
             DA.SetDataList(2, twosides);
             DA.SetDataList(3,bf);
         }

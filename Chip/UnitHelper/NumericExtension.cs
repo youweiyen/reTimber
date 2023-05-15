@@ -13,8 +13,14 @@ namespace Chip.UnitHelper
         {
             return length * GetConversionFactor();
         }
-
-
+        public static double FromMeter2(this double length)
+        {
+            return length * (GetConversionFactor()*GetConversionFactor());
+        }
+        public static double ToMeter2(this double length)
+        {
+            return length / (GetConversionFactor() * GetConversionFactor());
+        }
         public static double GetConversionFactor()
         {
 
