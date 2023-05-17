@@ -172,15 +172,15 @@ namespace Chip.TimberFab
                     
                     double fMArea = AreaMassProperties.Compute(fM, true, false, false, false).Area;
                     
-                    if (fMArea > meshSize)
-                    {
+                    //if (fMArea > meshSize)
+                    //{
 
                         foreach (Mesh bM in orderSecondSide)
                         {
                             List<Mesh> groupMesh = new List<Mesh>();
                             double bMArea = AreaMassProperties.Compute(bM, true, false, false, false).Area;
-                            if (bMArea > meshSize)
-                            {
+                            //if (bMArea > meshSize)
+                            //{
                                 #region Rtree close surface
                                 try
                                 {
@@ -229,28 +229,30 @@ namespace Chip.TimberFab
                                 }
                                 #endregion
 
-                                fM.RebuildNormals();
-                                bM.RebuildNormals();
+                                #region opposite faces vector WIP
+                                //fM.RebuildNormals();
+                                //bM.RebuildNormals();
 
-                                double fX = fM.Normals.Average(normals => normals.X);
-                                double fY = fM.Normals.Average(normals => normals.Y);
-                                double fZ = fM.Normals.Average(normals => normals.Z);
-                                Vector3d fNormal = new Vector3d(fX, fY, fZ);
+                                //double fX = fM.Normals.Average(normals => normals.X);
+                                //double fY = fM.Normals.Average(normals => normals.Y);
+                                //double fZ = fM.Normals.Average(normals => normals.Z);
+                                //Vector3d fNormal = new Vector3d(fX, fY, fZ);
 
-                                double bX = fM.Normals.Average(normals => normals.X);
-                                double bY = fM.Normals.Average(normals => normals.Y);
-                                double bZ = fM.Normals.Average(normals => normals.Z);
-                                Vector3d bNormal = new Vector3d(bX, bY, bZ);
+                                //double bX = fM.Normals.Average(normals => normals.X);
+                                //double bY = fM.Normals.Average(normals => normals.Y);
+                                //double bZ = fM.Normals.Average(normals => normals.Z);
+                                //Vector3d bNormal = new Vector3d(bX, bY, bZ);
 
-                                double oppositeAngle = Vector3d.VectorAngle(fNormal, bNormal);
+                                //double oppositeAngle = Vector3d.VectorAngle(fNormal, bNormal);
 
-                                if(oppositeAngle.ToDegrees() > 90)
-                                {
+                                //if(oppositeAngle.ToDegrees() > 90)
+                                //{
                                     
-                                }
-                            }
+                                //}
+                                #endregion
+                            //}
                         }
-                    }
+                    //}
                 }   
                     
             }
